@@ -1,7 +1,9 @@
 import * as FileSystem from 'expo-file-system';
 import { MERIVA_MANUAL } from './merivaManual';
+import { readJsonWithRecovery, writeJsonAtomically } from '../storage/atomicJsonFile';
 
 export interface VehicleProfile {
+  schemaVersion?: number;
   vehicleName: string;
   year: number;
   make: string;
@@ -21,84 +23,81 @@ export interface VehicleProfile {
   ecuAddress?: string;
 }
 
+const VEHICLE_SCHEMA_VERSION = 1;
+let vehicleProfileStorageWarning: string | null = null;
+
+export function getVehicleProfileStorageWarning(): string | null { return vehicleProfileStorageWarning; }
+
+function isVehicleProfile(value: unknown): value is VehicleProfile {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const raw = value as Record<string, unknown>;
+  if (raw.schemaVersion !== undefined && raw.schemaVersion !== VEHICLE_SCHEMA_VERSION) return false;
+  return typeof raw.vehicleName === 'string' && typeof raw.year === 'number' && Number.isFinite(raw.year) &&
+    typeof raw.make === 'string' && typeof raw.model === 'string' && typeof raw.engine === 'string' &&
+    typeof raw.createdAt === 'string' && Number.isFinite(Date.parse(raw.createdAt)) &&
+    typeof raw.lastModified === 'string' && Number.isFinite(Date.parse(raw.lastModified)) &&
+    typeof raw.protocolBaseline === 'string';
+}
+
+function isFutureVehicleProfile(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const version = (value as { schemaVersion?: unknown }).schemaVersion;
+  return typeof version === 'number' && Number.isInteger(version) && version > VEHICLE_SCHEMA_VERSION;
+}
+
 export async function createVehicleProfile(basePath: string, profile: VehicleProfile): Promise<void> {
   await FileSystem.makeDirectoryAsync(`${basePath}/CONFIG`, { intermediates: true });
   const target = `${basePath}/CONFIG/veiculo.json`;
-  await FileSystem.writeAsStringAsync(target, JSON.stringify(profile, null, 2), { encoding: FileSystem.EncodingType.UTF8 });
+  await writeJsonAtomically(target, { ...profile, schemaVersion: VEHICLE_SCHEMA_VERSION }, isVehicleProfile, isFutureVehicleProfile);
+  vehicleProfileStorageWarning = null;
 }
 
 export async function readVehicleProfile(basePath: string): Promise<VehicleProfile | null> {
   const target = `${basePath}/CONFIG/veiculo.json`;
-  const info = await FileSystem.getInfoAsync(target);
-  if (!info.exists || info.isDirectory) return null;
+  const result = await readJsonWithRecovery(target, isVehicleProfile, isFutureVehicleProfile);
+  vehicleProfileStorageWarning = result.recoveredFromPrevious ? 'PERFIL RECUPERADO DA CÓPIA ANTERIOR; O ARQUIVO PRINCIPAL FOI PRESERVADO.' : null;
+  return result.value ?? null;
+}
 
-  try {
-    const content = await FileSystem.readAsStringAsync(target);
-    const parsed = JSON.parse(content) as Partial<VehicleProfile>;
-    if (
-      typeof parsed.vehicleName !== 'string' ||
-      typeof parsed.year !== 'number' ||
-      typeof parsed.make !== 'string' ||
-      typeof parsed.model !== 'string' ||
-      typeof parsed.engine !== 'string' ||
-      typeof parsed.createdAt !== 'string' ||
-      typeof parsed.lastModified !== 'string' ||
-      typeof parsed.protocolBaseline !== 'string'
-    ) {
-      return null;
-    }
-    return parsed as VehicleProfile;
-  } catch {
-    return null;
-  }
+function createDefaultVehicleProfile(now: string): VehicleProfile {
+  return {
+    schemaVersion: VEHICLE_SCHEMA_VERSION, vehicleName: 'Meriva Maxx', year: 2012,
+    make: 'Chevrolet', model: 'Meriva Maxx', engine: MERIVA_MANUAL.engine.designation,
+    displacementCm3: MERIVA_MANUAL.engine.displacementCm3, cylinders: MERIVA_MANUAL.engine.cylinders,
+    fuel: 'Gasolina / Álcool', modelYearReference: MERIVA_MANUAL.modelYearReference,
+    tankCapacityL: MERIVA_MANUAL.capacities.fuelTankL,
+    reserveCapacityL: MERIVA_MANUAL.capacities.fuelReserveApproxL, manualSource: MERIVA_MANUAL.source,
+    createdAt: now, lastModified: now,
+    protocolBaseline: 'ISO 14230-4 KWP FAST INIT / K-LINE (OBSERVADO)', ecuAddress: '0x11',
+  };
 }
 
 export async function ensureMerivaVehicleProfile(basePath: string): Promise<VehicleProfile> {
-  const existing = await readVehicleProfile(basePath);
   const now = new Date().toISOString();
-
+  let existing: VehicleProfile | null;
+  try {
+    existing = await readVehicleProfile(basePath);
+  } catch (cause) {
+    vehicleProfileStorageWarning = 'PERFIL DO VEÍCULO NÃO GRAVÁVEL: '
+      + (cause instanceof Error ? cause.message : String(cause))
+      + '. PERFIL PADRÃO USADO SOMENTE EM MEMÓRIA; ARQUIVO ORIGINAL PRESERVADO.';
+    console.warn('[vehicle] ', vehicleProfileStorageWarning);
+    return createDefaultVehicleProfile(now);
+  }
   if (existing) {
     const normalized: VehicleProfile = {
-      ...existing,
-      vehicleName: 'Meriva Maxx',
-      year: MERIVA_MANUAL.modelYear,
-      make: 'Chevrolet',
-      model: 'Meriva Maxx',
-      engine: MERIVA_MANUAL.engine.designation,
-      displacementCm3: MERIVA_MANUAL.engine.displacementCm3,
-      cylinders: MERIVA_MANUAL.engine.cylinders,
-      fuel: 'Gasolina / Álcool',
-      modelYearReference: MERIVA_MANUAL.modelYearReference,
-      tankCapacityL: MERIVA_MANUAL.capacities.fuelTankL,
-      reserveCapacityL: MERIVA_MANUAL.capacities.fuelReserveApproxL,
-      manualSource: MERIVA_MANUAL.source,
-      protocolBaseline: 'ISO 14230-4 KWP FAST INIT / K-LINE (OBSERVADO)',
-      ecuAddress: '0x11',
-      lastModified: now,
+      ...existing, schemaVersion: VEHICLE_SCHEMA_VERSION,
+      vehicleName: 'Meriva Maxx', year: MERIVA_MANUAL.modelYear, make: 'Chevrolet', model: 'Meriva Maxx',
+      engine: MERIVA_MANUAL.engine.designation, displacementCm3: MERIVA_MANUAL.engine.displacementCm3,
+      cylinders: MERIVA_MANUAL.engine.cylinders, fuel: 'Gasolina / Álcool',
+      modelYearReference: MERIVA_MANUAL.modelYearReference, tankCapacityL: MERIVA_MANUAL.capacities.fuelTankL,
+      reserveCapacityL: MERIVA_MANUAL.capacities.fuelReserveApproxL, manualSource: MERIVA_MANUAL.source,
+      protocolBaseline: 'ISO 14230-4 KWP FAST INIT / K-LINE (OBSERVADO)', ecuAddress: '0x11', lastModified: now,
     };
     if (JSON.stringify(normalized) !== JSON.stringify(existing)) await createVehicleProfile(basePath, normalized);
     return normalized;
   }
-
-  const profile: VehicleProfile = {
-    vehicleName: 'Meriva Maxx',
-    year: 2012,
-    make: 'Chevrolet',
-    model: 'Meriva Maxx',
-    engine: MERIVA_MANUAL.engine.designation,
-    displacementCm3: MERIVA_MANUAL.engine.displacementCm3,
-    cylinders: MERIVA_MANUAL.engine.cylinders,
-    fuel: 'Gasolina / Álcool',
-    modelYearReference: MERIVA_MANUAL.modelYearReference,
-    tankCapacityL: MERIVA_MANUAL.capacities.fuelTankL,
-    reserveCapacityL: MERIVA_MANUAL.capacities.fuelReserveApproxL,
-    manualSource: MERIVA_MANUAL.source,
-    createdAt: now,
-    lastModified: now,
-    protocolBaseline: 'ISO 14230-4 KWP FAST INIT / K-LINE (OBSERVADO)',
-    ecuAddress: '0x11',
-  };
-
+  const profile = createDefaultVehicleProfile(now);
   await createVehicleProfile(basePath, profile);
   return profile;
 }

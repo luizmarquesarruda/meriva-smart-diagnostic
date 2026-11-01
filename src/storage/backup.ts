@@ -1,5 +1,8 @@
 import * as FileSystem from 'expo-file-system';
 import { flushCsvLogs } from '../database/csvLogger';
+import { autoTripService } from '../trip/autoTripService';
+import { flushLearningPersistenceQueue } from '../meriva/autosaveIntegration';
+import { saveNow } from '../meriva/autosaveManager';
 
 export interface BackupInfo {
   timestamp: string;
@@ -109,7 +112,7 @@ async function pruneOldBackups(basePath: string): Promise<void> {
   }
 }
 
-export async function createBackup(basePath: string): Promise<BackupInfo> {
+async function createBackupSnapshot(basePath: string): Promise<BackupInfo> {
   await flushCsvLogs();
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupRoot = `${basePath}/BACKUP`;
@@ -164,6 +167,23 @@ export async function createBackup(basePath: string): Promise<BackupInfo> {
   }
 }
 
+
+async function withConsistentStorageSnapshot<T>(operation: () => Promise<T>): Promise<T> {
+  return autoTripService.withPollingPaused(async () => {
+    const saved = await saveNow('critical');
+    if (!saved) {
+      throw new Error('AUTOSAVE_NAO_CONFIRMADO; BACKUP_CANCELADO_PARA_EVITAR_SNAPSHOT_INCONSISTENTE.');
+    }
+    await flushLearningPersistenceQueue();
+    await flushCsvLogs();
+    return operation();
+  });
+}
+
+export async function createBackup(basePath: string): Promise<BackupInfo> {
+  return withConsistentStorageSnapshot(() => createBackupSnapshot(basePath));
+}
+
 /** Returns only backups whose manifest and every copied directory still verify. */
 export async function listVerifiedBackups(basePath: string): Promise<StoredBackupInfo[]> {
   const root = `${basePath}/BACKUP`;
@@ -197,7 +217,7 @@ export async function listVerifiedBackups(basePath: string): Promise<StoredBacku
  * A fresh safety backup is created first. On a copy failure, all affected
  * directories are rolled back from that safety snapshot before the error is returned.
  */
-export async function restoreBackup(basePath: string, backupName: string): Promise<RestoreBackupResult> {
+async function restoreBackupSnapshot(basePath: string, backupName: string): Promise<RestoreBackupResult> {
   if (!isSafeBackupName(backupName)) throw new Error('BACKUP_NAME_INVALID');
   await flushCsvLogs();
 
@@ -219,7 +239,7 @@ export async function restoreBackup(basePath: string, backupName: string): Promi
       if (stagedSize !== entry.sizeBytes) throw new Error('RESTORE_STAGING_VERIFY_FAILED: ' + entry.directory);
     }
 
-    const safety = await createBackup(basePath);
+    const safety = await createBackupSnapshot(basePath);
     const safetyBackupName = `meriva_smart_${safety.timestamp}`;
     const safetyDir = `${backupRoot}/${safetyBackupName}`;
     const restored: string[] = [];
@@ -286,4 +306,8 @@ export async function restoreBackup(basePath: string, backupName: string): Promi
   } finally {
     await FileSystem.deleteAsync(stagingDir, { idempotent: true }).catch(() => undefined);
   }
+}
+
+export async function restoreBackup(basePath: string, backupName: string): Promise<RestoreBackupResult> {
+  return withConsistentStorageSnapshot(() => restoreBackupSnapshot(basePath, backupName));
 }

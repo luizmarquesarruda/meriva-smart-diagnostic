@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
-import { flushCsvLogs } from '../database/csvLogger';
+import { flushCsvLogs, getActiveCsvLogPaths } from '../database/csvLogger';
+import { CLEANUP_DIRECTORIES, sortCleanupCandidates } from './cleanupPolicy';
 
 export interface StorageQuotaConfig {
   limitMb: number;
@@ -28,12 +29,19 @@ async function getEntrySizeBytes(path: string): Promise<number> {
 
 interface DeletableStorageFile { path: string; size: number; modifiedAt: number; }
 
-async function collectDeletableFiles(path: string, output: DeletableStorageFile[]): Promise<void> {
-  const info = await FileSystem.getInfoAsync(path, { size: true });
-  if (!info.exists) return;
+async function collectDeletableFiles(path: string, output: DeletableStorageFile[], protectedPathsForCollection: Set<string>): Promise<number> {
+  let failed = 0;
+  let info;
+  try {
+    info = await FileSystem.getInfoAsync(path, { size: true });
+  } catch {
+    return 1;
+  }
+  if (!info.exists) return 0;
   if (!info.isDirectory) {
+    if (protectedPathsForCollection.has(path)) return 0;
     if (typeof info.size !== 'number' || !Number.isFinite(info.size) || info.size < 0) {
-      throw new Error('TAMANHO_DE_ARQUIVO_INDISPONIVEL: ' + path);
+      return 1;
     }
     output.push({
       path,
@@ -42,34 +50,46 @@ async function collectDeletableFiles(path: string, output: DeletableStorageFile[
         ? info.modificationTime
         : 0,
     });
-    return;
+    return 0;
   }
-  const children = await FileSystem.readDirectoryAsync(path);
-  for (const child of children) await collectDeletableFiles(`${path}/${child}`, output);
+  let children: string[];
+  try {
+    children = await FileSystem.readDirectoryAsync(path);
+  } catch {
+    return 1;
+  }
+  for (const child of children) failed += await collectDeletableFiles(`${path}/${child}`, output, protectedPathsForCollection);
+  return failed;
 }
 
 /**
  * Reclaims space only from LOGS and LEITURAS, oldest first. Configuration,
  * trips, learning data and backups are never automatic-cleanup targets.
  */
-async function cleanupToTarget(basePath: string, targetBytes: number): Promise<{ removed: number; usedBytes: number }> {
+async function cleanupToTarget(basePath: string, targetBytes: number): Promise<{ removed: number; failed: number; usedBytes: number }> {
   await flushCsvLogs();
   let usedBytes = await getEntrySizeBytes(basePath);
-  if (usedBytes <= targetBytes) return { removed: 0, usedBytes };
+  if (usedBytes <= targetBytes) return { removed: 0, failed: 0, usedBytes };
 
   const candidates: DeletableStorageFile[] = [];
-  for (const directory of ['LOGS', 'LEITURAS']) {
-    await collectDeletableFiles(`${basePath}/${directory}`, candidates);
+  const protectedPaths = new Set(getActiveCsvLogPaths());
+  let failed = 0;
+  for (const directory of CLEANUP_DIRECTORIES) {
+    failed += await collectDeletableFiles(`${basePath}/${directory}`, candidates, protectedPaths);
   }
-  candidates.sort((a, b) => a.modifiedAt - b.modifiedAt);
+  const orderedCandidates = sortCleanupCandidates(candidates);
   let removed = 0;
-  for (const item of candidates) {
+  for (const item of orderedCandidates) {
     if (usedBytes <= targetBytes) break;
-    await FileSystem.deleteAsync(item.path, { idempotent: true });
-    usedBytes = Math.max(0, usedBytes - item.size);
-    removed += 1;
+    try {
+      await FileSystem.deleteAsync(item.path, { idempotent: true });
+      usedBytes = Math.max(0, usedBytes - item.size);
+      removed += 1;
+    } catch {
+      failed += 1;
+    }
   }
-  return { removed, usedBytes };
+  return { removed, failed, usedBytes };
 }
 
 function toMb(bytes: number): number {
@@ -113,6 +133,7 @@ export async function checkStorageQuota(
       cleanupNote = result.removed > 0
         ? ` LIMPEZA: ${result.removed} arquivo(s) removido(s).`
         : ' LIMPEZA AUTOMÁTICA NÃO ENCONTROU ARQUIVOS DESCARTÁVEIS.';
+      if (result.failed > 0) cleanupNote += ` Falhas ao limpar: ${result.failed} arquivo(s).`;
       if (usedMb > targetMb) {
         cleanupNote += ` Meta de ${targetMb} MB não atingida sem remover dados não descartáveis.`;
       }

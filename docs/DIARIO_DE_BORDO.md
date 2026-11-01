@@ -1,3 +1,29 @@
+## ESTADO VIGENTE — 2026-10-31 (P0/P1 robustez de viagens, JSON, backup, Bluetooth e GPS)
+
+- DB-202 — Publicação do APK também em PRs do próprio repositório; forks continuam sem upload. A execução de PR #109 anterior compilou e verificou o APK, mas não publicou artefato porque a condição estava limitada à `main`.
+- DB-204 — Overflow CSV passa a usar segmentos CSV canônicos verificados e enumeráveis após reinício; o antigo `.queue-*` sem consumidor deixa de ser gerado. O teste de reinício integra `npm test` e o gate anti-regressão.
+- DB-201 — Testes JSON alinhados ao contrato: erros explícitos na leitura direta de corrupção, defaults somente em memória nas telas e bloqueio de escrita sobre schema futuro.
+- DB-200 — Teste Bluetooth atualizado para verificar retries limitados no `bluetoothManager` e uma única descoberta de pareados por varredura; não foi alterada a lógica de conexão.
+- DB-199 — Gate de baseline alinhado à política de APK público: não exige visibilidade privada, bloqueia Releases automáticas e confere retenção de 14 dias.
+- DB-202 amplia o upload de APK: `main` e PRs originadas neste repositório publicam artefatos; PRs de forks apenas compilam e validam, sem upload.
+- DB-198 — Política de artefato CI: compilar e verificar APK em PRs, mas publicar o APK e SHA-256 somente em execuções da branch `main`, com retenção de 14 dias.
+- A alteração reconcilia a regra de upload com a decisão de manter o artefato público sem criar Releases automáticas nem publicar APKs de branches de trabalho.
+- DB-197 — Branch de integração: `fix/storage-and-history-integrity-20261031`, sobre o estado de `main` documentado em 31/10/2026. Escopo ampliado para preservar viagens pendentes, endurecer JSON local, coordenar snapshots, cancelar descoberta Bluetooth e manter GPS foreground em falha de background.
+- A finalização de uma viagem só libera o gravador após índice JSON, resumo CSV idempotente e checkpoint do autosave serem confirmados. Falha mantém a viagem pendente e bloqueia novas amostras para não misturar sessões.
+- Backup/restauração passam a pausar e drenar o ciclo OBD, confirmar autosave, descarregar aprendizado e CSV antes da cópia/substituição. Configurações, veículo, manutenção e aprendizado passam a usar gravação JSON temporária validada e cópia anterior; corrupção sem recuperação não é substituída por padrões.
+- Versões futuras dos históricos/configurações são tratadas como incompatíveis e preservadas; a tela Viagens informa a indisponibilidade em vez de exibir um histórico vazio. O índice sequencial deste diário é sincronizado com DB-195, DB-196 e DB-197.
+- Testes comportamentais foram adicionados para falha de persistência, recuperação JSON, retenção de abastecimentos, cancelamento de candidatos Bluetooth, transição GPS e consistência de backup. A segunda auditoria estática e a CI da cabeça final permanecem pendentes neste registro; nenhum resultado é presumido.
+- SQLite permanece adiado: a medição equivalente no Galaxy A06 ainda é necessária; nenhum histórico foi migrado.
+
+- DB-194 — Branch de trabalho: `fix/storage-and-history-integrity-20261031`, criada sobre o `main` observado em 31/10/2026. Escopo: rotação/spool de CSV, deduplicação e reconciliação do histórico de viagens, e remoção da cópia persistente de viagens no autosave.
+- O logger mantém o formato CSV e o FileSystem legacy do Expo SDK 51. Os arquivos diários usam partes de até 512 KiB; a primeira parte conserva o nome legado. Ao alcançar 10.000 linhas pendentes, chunks imutáveis são gravados e relidos para verificação. O limite duro em RAM é 20.000; qualquer descarte residual permanece contado e reportado.
+- `VIAGENS/index.json` é agora a fonte persistente canônica de viagens. O índice é deduplicado pelo ID, preservando o registro validado com mais amostras de telemetria; gravações repetidas do mesmo ID não duplicam a linha CSV de resumo.
+- Na abertura, o app reconcilia uma única vez registros de viagem existentes em autosaves antigos com o índice canônico. Novos autosaves armazenam `driveCycles: []`; o objeto em memória continua recebendo o histórico do índice para as telas. O validador aceita payloads antigos com o campo e os novos sem ele.
+- SQLite permanece adiado: não adicionar dependência ou converter dados até medir a instalação real, definir baseline de desempenho e validar migração/backup/rollback. As alterações desta rodada reduzem o crescimento sem trocar o armazenamento nativo nem o schema de exportação.
+- Testes adicionados para rotação CSV, idempotência do resumo de viagem, deduplicação preservando telemetria e compatibilidade dos autosaves antigos. CI ainda deve ser executada no SHA final desta branch; nenhum resultado de CI/build ou ensaio físico é declarado neste registro.
+
+---
+
 ## ESTADO VIGENTE — 2026-10-31 (P0 relatórios, layout e estabilidade)
 
 > PR #105 integrada em `main` no commit `b128b413427e612e621dc2ef2c82b6c2476ce659`. PR #104 integrada em `main` no commit `4055a776a4e95e1ec775c6b0ae039da234a7c6c6`. Ambas passaram `validate` e `android-build` nos respectivos SHAs finais.
@@ -285,6 +311,18 @@
 - **DB-192** · 2026-10-31 — Integrar layout e relatórios, consolidar P0 e registrar validação dos SHAs finais
 - **DB-193** · 2026-10-31 — Velocidade derivada GPS e recuperação atômica do histórico ECU
 - **DB-194** · 2026-10-31 — Auditoria estática do layout no Galaxy A06 / Android 16
+- **DB-195** · 2026-10-31 — Instrumentação de tamanho e latência do histórico no aparelho
+- **DB-196** · 2026-10-31 — Versionamento do índice de viagens e observabilidade dos buffers
+- **DB-197** · 2026-10-31 — Endurecer finalização de viagens, persistência JSON, backup, Bluetooth e GPS
+- **DB-198** · 2026-10-31 — Preservar artefato APK público somente na main
+- **DB-199** · 2026-10-31 — Alinhar gate de CI à política do APK público
+- **DB-200** · 2026-10-31 — Sincronizar teste de retry Bluetooth com o ponto real de implementação
+- **DB-201** · 2026-10-31 — Cobrir fallback não destrutivo e proteção de schema futuro nos testes JSON
+- **DB-202** · 2026-10-31 — Publicar artefato APK nas PRs do próprio repositório
+- **DB-203** · 2026-11-01 — Corrigir compilação do logger CSV e isolamento dos testes de limpeza
+- **DB-204** · 2026-11-01 — Tornar o overflow CSV recuperável como segmentos canônicos após reinício
+- **DB-205** · 2026-11-01 — Instrumentar diagnóstico por tentativa no fallback de protocolo ELM
+- **DB-206** · 2026-11-01 — Tornar o benchmark JSON estrito e consistente para a decisão SQLite
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -4994,3 +5032,130 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Relatório detalhado: docs/AUDITORIA_LAYOUT_GALAXY_A06_ANDROID_16_2026-10-31.md.
 - Limite: auditoria estática de código/documentação. Nenhuma captura, instalação ou inspeção física do Galaxy A06 foi realizada nesta rodada. O teste visual no aparelho continua pendente.
 
+
+
+## DB-195 · 2026-10-31 — Instrumentação de tamanho e latência do histórico no aparelho
+
+- Adicionada medição executável em Armazenamento para coletar no dispositivo real o tamanho do índice JSON de viagens, bytes de CSV, viagens, IDs únicos e amostras embutidas nos registros de viagem.
+- A leitura/parse e a gravação temporária com read-back são medidas em sete rodadas; o relatório exibe mediana, p95 e mínimo. O arquivo principal e o backup do histórico são somente leitura durante o ensaio; gravações usam arquivo temporário exclusivo e removido ao final.
+- O ensaio falha se o índice estiver inválido, se o número de viagens mudar durante a coleta ou se o conteúdo escrito divergir do original. Não há migração ou limpeza automática.
+- A tela identifica plataforma e API Android, permitindo que a coleta seja feita no Galaxy A06 / SM-A065M / Android 16 após instalar o APK.
+- A comparação SQLite ainda não foi executada: o projeto não possui expo-sqlite instalado no lockfile e não há medição física disponível nesta sessão. Não foi inventado resultado nem iniciada migração de produção.
+- Os buffers existentes permanecem com watermark de 10.000 linhas, limite rígido de 20.000 e spool em blocos de 128; nenhuma capacidade foi aumentada.
+- Próxima etapa após a coleta no A06: executar JSON e SQLite com o mesmo snapshot congelado de viagens e amostras, comparar bytes e latências de leitura/gravação, e só então decidir migração seletiva. Preservar JSON e validar IDs, contagens, checksum e restauração antes de qualquer troca de fonte.
+- Limite desta rodada: a medição do JSON foi instrumentada, mas ainda não foi executada no aparelho; a CI não substitui o ensaio físico.
+
+
+## DB-196 · 2026-10-31 — Versionamento do índice de viagens e observabilidade dos buffers
+
+- O índice de viagens passa a declarar schemaVersion 2. Instalações legadas sem schemaVersion (schema 1) são migradas para v2 após cópia do JSON anterior e validação do backup; totalCount é recalculado a partir de cycles e campos adicionais são preservados.
+- O app rejeita schemaVersion futuro ou inválido sem regravar o arquivo. A escrita continua usando temporário, read-back e cópia anterior; o novo schemaVersion só é persistido no snapshot validado.
+- A política de fila CSV foi isolada em função pura e conectada ao logger. Teste de estresse simula 50.000 chegadas com spool disponível, verificando limites, descarte zero e acionamento do watermark; os limites operacionais permanecem 10.000 / 20.000 / 128.
+- A tela Armazenamento agora exibe pico de fila, total de flushes, duração do último e do maior flush e falhas de flush, além dos contadores já existentes de spool e descarte.
+- A medição de JSON descrita em DB-195 continua aguardando execução no Galaxy A06. A comparação equivalente com SQLite não foi feita e nenhuma viagem foi migrada para SQLite.
+- O próximo gate é CI completa no SHA final; depois, executar o benchmark no aparelho e decidir a migração com base em tamanho, p95 de leitura/gravação e consultas reais. Preservar JSON e testar restauração antes de alterar a fonte de leitura.
+
+
+## DB-197 · 2026-10-31 — Endurecer finalização de viagens, persistência JSON, backup, Bluetooth e GPS
+
+- **Finalização de viagem:** o gravador permanece acessível enquanto o índice canônico, a linha CSV de resumo e o autosave não estiverem confirmados. A gravação do índice/CSV é repetível pelo ID estável; uma falha mantém o estado pendente e a próxima sessão não recebe amostras da viagem anterior.
+- **Ciclo OBD e backup:** o AutoTripService expõe uma barreira que interrompe novas consultas e aguarda o ciclo em andamento. Backup e restauração usam essa barreira, exigem checkpoint de autosave e descarregam fila de aprendizado/CSV antes de copiar ou substituir os diretórios.
+- **JSON local:** configurações, perfil do veículo, manutenção/abastecimentos e perfil de aprendizado usam arquivo temporário, read-back validado e cópia anterior validada. Arquivo corrompido sem cópia recuperável não é substituído por valores padrão. Arquivo de versão futura não pode ser sobrescrito por aplicativo antigo; o arquivo corrompido é preservado para inspeção.
+- **Manutenção:** o histórico de abastecimentos deixa de ser truncado silenciosamente aos 100 registros. A interface só limpa litros/valor depois da confirmação da gravação e informa quando houve recuperação da cópia anterior.
+- **Bluetooth:** a geração de conexão atravessa preparação, descoberta e toda a fila de candidatos. Desconexão manual cancela a fila, callbacks antigos não reabrem estados e a tentativa pendente termina sua limpeza antes de liberar uma nova conexão.
+- **GPS:** o watcher foreground não é removido antes da confirmação de início do serviço nativo em segundo plano. Falha restaura o estado anterior e mantém a coleta em primeiro plano.
+- **Histórico de viagens:** leitura, reconciliação e gravação bloqueiam downgrade de schema futuro. A tela de viagens exibe estado indisponível com orientação explícita, em vez de apresentar uma lista vazia.
+- **Regressões adicionadas:** falha ao persistir viagem não chama a liberação do gravador; JSON futuro não é substituído; manutenção preserva mais de 100 abastecimentos; Bluetooth não avança ao próximo candidato após cancelamento; GPS mantém watcher foreground se o serviço background falhar; backup exige barreira de snapshot.
+- **Validação:** as alterações e os testes foram preparados sem disparar CI. A segunda auditoria estática deve anteceder a execução da CI na cabeça final. Este registro não declara teste local, build Android ou ensaio físico concluído.
+- **SQLite:** permanece sem migração. A decisão continua condicionada à medição real de JSON e à comparação equivalente com SQLite no Galaxy A06, conforme DB-195.
+
+
+## DB-198 · 2026-10-31 — Preservar artefato APK público somente na main
+
+### Decisão e alteração
+- O workflow continua executando validate e android-build nas pull requests.
+- O APK standalone e seu checksum SHA-256 são enviados como artefato somente quando github.ref == refs/heads/main; nenhum APK é publicado a partir de branches de trabalho ou PRs.
+- A retenção do artefato foi alinhada para 14 dias, conforme a decisão operacional de manter o download público do artefato da branch principal.
+- Não há criação de GitHub Release automática nem concessão de permissões de escrita ao workflow.
+
+### Validação
+- Esta alteração foi preparada na branch fix/storage-and-history-integrity-20261031 para disparar a CI sobre o novo HEAD.
+- A aprovação depende de gate:baseline, validate e android-build verdes no SHA resultante. Nenhum resultado é presumido.
+- A distribuição pública depende de uma execução posterior em main; a execução de PR deve apenas compilar e verificar o APK.
+
+## DB-199 · 2026-10-31 — Alinhar gate de CI à política do APK público
+
+### Correção
+- O teste de baseline deixou de exigir que o repositório seja privado para permitir o upload do APK.
+- O gate agora exige que a etapa de upload use a condição exata `github.ref == 'refs/heads/main'` e rejeita dependência de visibilidade do repositório.
+- A retenção esperada foi atualizada de 3 para 14 dias, conforme o workflow.
+- PRs continuam compilando e validando o APK, mas não fazem upload; a política de não criar Releases automáticas e de manter permissões somente de leitura permanece.
+
+### Validação
+- Corrigidos teste, changelog e este diário no mesmo commit para evitar execuções intermediárias da CI.
+- A CI deve confirmar `gate:baseline`, `validate` e `android-build` no SHA final. Até esses jobs terminarem, a PR não deve ser mesclada.
+
+## DB-200 · 2026-10-31 — Sincronizar teste de retry Bluetooth com o ponto real de implementação
+
+- O teste antigo procurava comentários sobre três tentativas, intervalo de 1,5 s e mesma varredura dentro de `sharedConnection.ts`, embora a implementação do retry estivesse em `bluetoothManager.ts`.
+- O teste agora verifica o loop limitado por `effectiveMaxAttempts`, a espera configurada entre falhas transitórias, a interrupção em erro terminal e o retorno imediato após sucesso.
+- Também confirma que `sharedConnection.ts` descobre os dispositivos pareados uma vez, constrói a lista de candidatos com esse snapshot e executa a fila sem repetir a descoberta.
+- Nenhum comportamento de conexão ou limite de retry foi alterado; somente as expectativas desatualizadas do teste foram alinhadas ao código existente.
+- A CI deve repetir gate:baseline, TypeScript, suíte completa e build Android no novo SHA. Não mesclar antes da validação completa.
+
+## DB-201 · 2026-10-31 — Cobrir fallback não destrutivo e proteção de schema futuro nos testes JSON
+
+- O teste direto de perfil do veículo agora espera erro quando o JSON está corrompido e não existe cópia anterior válida; confirma que o arquivo original permanece intacto.
+- O fluxo `ensureMerivaVehicleProfile` é testado separadamente: pode fornecer o perfil Meriva padrão em memória, mas deve emitir aviso e não regravar o arquivo danificado.
+- Configurações seguem a política da interface: em caso de arquivo corrompido ou schema futuro, retornam padrões somente em memória e expõem aviso de armazenamento; a leitura não grava o arquivo.
+- Acrescentada verificação de que uma gravação explícita por uma versão antiga é rejeitada quando o arquivo contém schema futuro, preservando o conteúdo byte a byte.
+- As correções ajustam expectativas de teste ao contrato implementado; não alteram produção nem enfraquecem a proteção contra perda de dados.
+- Repetir CI completa no SHA desta atualização; não mesclar antes de `validate` e `android-build` verdes.
+
+## DB-202 · 2026-10-31 — Publicar artefato APK nas PRs do próprio repositório
+
+- A execução anterior da PR #109 concluiu `validate` e `android-build`, inclusive a verificação do APK e do SHA-256, mas a etapa de upload foi ignorada pela condição exclusiva de `main`; por isso nenhum artefato ficou disponível para download.
+- O workflow agora publica o APK standalone e seu checksum em execuções de `main` e em PRs cuja branch de origem pertença ao próprio repositório.
+- PRs originadas em forks continuam sem upload de artefato; o build e a validação permanecem executados normalmente.
+- Retenção de 14 dias; sem GitHub Release automática e sem permissão `contents: write`.
+- A CI precisa executar novamente no novo SHA e confirmar o artefato na lista da execução. O APK anterior não foi guardado como artefato e não pode ser recuperado dessa execução.
+## DB-203 · 2026-11-01 — Corrigir compilação do logger CSV e isolamento dos testes de limpeza
+
+- Removido um fragmento duplicado/truncado em `src/database/csvLogger.ts`, restaurando o fechamento do matcher dos segmentos CSV diários sem alterar a política de rotação ou a serialização.
+- Corrigido o estreitamento de tipo em `src/storage/cleanup.ts`: `modificationTime` só é acessado quando `getInfoAsync` confirma que o arquivo existe.
+- O teste de robustez da limpeza agora isola as dependências do logger CSV e da política de retenção; a política real continua coberta por sua suíte própria.
+- A execução CI do SHA `f05e03009ee4c66bf03f58c1dbcc56e18955fa09` passou por `expo-doctor` e `gate:baseline`; `npm run validate` ainda está em execução.
+- Nenhum merge foi realizado. A compilação e o ensaio físico no Galaxy A06/ELM327 permanecem pendentes.
+
+## DB-204 · 2026-11-01 — Tornar o overflow CSV recuperável como segmentos canônicos após reinício
+
+- A auditoria da PR #109 identificou que `spillPendingCsvRows` gravava arquivos `.queue-*`, mas o leitor/enumeração de segmentos e a deduplicação do histórico não os consumiam. Isso deixava linhas persistidas fisicamente sem integração ao fluxo normal após reinício; não foi classificado como perda física comprovada.
+- O overflow agora grava segmentos CSV canônicos: o primeiro usa o nome diário legado e os seguintes seguem `.part-NNNN.csv`. A gravação ocorre em arquivo temporário, com leitura de retorno, validação de cabeçalho/quantidade e limite de bytes antes de mover o arquivo ao nome final.
+- A gravação normal também pré-calcula o tamanho UTF-8 do segmento completo. Quando um lote excederia 512 KiB, uma nova parte é criada sem reescrever a parte anterior; a leitura do diretório para alocação de uma nova parte falha explicitamente em vez de assumir diretório vazio.
+- Os chunks usam a união das colunas do lote e respeitam simultaneamente o limite de linhas e o limite de 512 KiB. A fila de novas amostras continua serializada por caminho, e o restante pendente é descarregado após a conclusão do spill.
+- `getCsvLogSegments` enumera as partes persistidas após reinício e também mantém legíveis os `.queue-*` de versões anteriores. A deduplicação consulta as partes novas e antigas; erros ao listar o diretório agora falham explicitamente em vez de aparentar histórico vazio. Os arquivos antigos não são apagados nem renomeados automaticamente. O contador `durablySpooledRows` é uma métrica em memória por execução, não um contador persistente.
+- Adicionado `tests/csvSpoolDurability.test.js`, cobrindo segmentos canônicos, colunas variáveis, limite por bytes, enumeração após novo carregamento do módulo e ausência de duplicação. O teste foi incluído em `npm test` e no gate `projectBaseline`.
+- Alinhado o nome do artefato APK com a PR #110 (`meriva-smart-diagnostic-standalone-apk-*`) e removida do changelog a afirmação obsoleta de que PRs do próprio repositório não publicam artefatos.
+- Commits principais de implementação/cobertura: `b734c197fa74ee241ab0f49cb3e31e34eb466054`, `5b725590fa847390a62c226eea4a4b6125d34d1c`, `8c941ad1dc137a402789469b6a27ee7aa6d76a1e`, `02e5122aa7f0e090de8ad9a800c8fc690f33615b`, `baec05b6be0a385964b276021243dfbb668fd424`, `49796b2e0c6d7d586bb209e4e7a20bcdb3b0cc42`, `702bf43a78f1c6b126920047cf81705bb758a7b1`, `37b9e554210ee7368d3b517fa9c2b94eb2ccc78f`, `d715f878170c04db833e8c5976713974dd04ea53`, `2f1a7013b10e039dd0fd15104a06636f6b2ea70f` e `b88e5e266655fca658db7b2155f4d8bd1efff259`.
+- A execução da CI deve ser conferida no HEAD final após os commits de recuperação, compatibilidade e teste; nenhum resultado é presumido nesta entrada. Nenhum merge ou teste físico no Galaxy A06/ELM327 foi realizado.
+
+## DB-205 · 2026-11-01 — Instrumentar diagnóstico por tentativa no fallback de protocolo ELM
+
+- A auditoria estática confirmou que a sessão só é aceita como ECU real após `010C` gerar payload válido `41 0C`, interpretado pelo parser com valor numérico finito. A seleção automática de candidatos e a exigência de resposta ECU válida permanecem inalteradas.
+- Foi identificada baixa observabilidade no fallback: antes, a saída de diagnóstico registrava a sonda inicial e o resultado final, mas não separava a resposta de cada `ATSPx` e a resposta `010C` após cada protocolo.
+- `src/obd/bluetoothManager.ts` agora registra `ELM_PROTOCOL_FALLBACK_START`, `ELM_PROTOCOL_FALLBACK_SET_RESULT`, `ELM_PROTOCOL_FALLBACK_ECU_PROBE_RESULT` e `ELM_PROTOCOL_FALLBACK_SUMMARY`, incluindo protocolo, status, resposta RX, duração, resultado do parser e validação ECU.
+- `tests/bluetoothLifecycle.test.js` protege a presença desses eventos; `docs/ELM327_ENGINEERING_PLAYBOOK.md` documenta como interpretar os registros e reforça que `ATSPx = OK` ou Bluetooth conectado não prova ECU funcional.
+- Não houve alteração na ordem dos protocolos alternativos, retries, timeouts, framing, parser ou gate `41 0C`. A instrumentação apenas torna explícita a evidência que falta quando o Galaxy A06 retorna timeout em `010C`.
+- Commits: `2403d762ba85ab5d31dd936492a8268c9dd8c524`, `2bb5472634a59e0e58b9164107cd059818e56494`, `7c8f9c5038b3abba72d1ad1167c0fe36519374fc`, `728ff4c6e1b9a0ad7ba01cc5292f4ce9a7886ee8`.
+- A validação TypeScript/suíte completa/Android build não foi confirmada no HEAD desta branch. O teste físico com Galaxy A06 SM-A065M, Android 16, adaptador ELM327 e a Meriva 1.4 Flex 2011 permanece pendente.
+
+## DB-206 · 2026-11-01 — Tornar o benchmark JSON estrito e consistente para a decisão SQLite
+
+- A auditoria encontrou que erros em `readDirectoryAsync` e `getInfoAsync` eram convertidos em diretório vazio/entrada ausente, permitindo subestimar volume de arquivos e produzir medições enganosas.
+- A medição agora falha explicitamente quando diretórios, entradas ou tamanhos não podem ser inspecionados; valida versão do schema, IDs de viagem e leitura canônica antes de medir.
+- Cada rodada compara o conteúdo bruto de `VIAGENS/index.json` com o snapshot inicial, cancelando se qualquer byte mudar. O tamanho JSON é contado em bytes UTF-8 do mesmo snapshot, e a escrita de benchmark usa nome temporário exclusivo com verificação de remoção.
+- A tela de Armazenamento aguarda o ciclo OBD encerrar via `autoTripService.withPollingPaused` antes de medir, reduzindo interferência de escrita durante a captura.
+- `tests/historyBenchmark.test.js` protege falha fechada, consistência do snapshot, contagem UTF-8, unicidade do scratch e pausa da aquisição.
+- A medição continua sendo apenas JSON versus leitura/gravação temporária. SQLite não foi comparado e não foi introduzido; a decisão continua bloqueada até capturar dados reais e latências no Galaxy A06, comparar os mesmos históricos e testar migração/rollback.
+- Commits: `6e15b84ccbe0ec782b7588b4a74701fbc2a45770`, `33bb56dc4fddc6b907982d4a6dc1f3e79c3722b5`, `41ee3f1423e0357607d3837a33a39ce19ee00242`, `23c09da19f5dfea5f775622edcf60766132eac1b`, `ab3d5e32951ed6627db7b71ac54132186355f62a`.
+- A CI no HEAD final e a medição física ainda precisam ser verificadas; não foi executado benchmark no aparelho nesta etapa.

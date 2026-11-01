@@ -9,14 +9,14 @@ import { AppIcon } from '../src/ui/AppIcon';
 import { NetworkStatusIndicator } from '../src/ui/NetworkStatusIndicator';
 import * as FileSystem from 'expo-file-system';
 import NetInfo from '@react-native-community/netinfo';
-import { readDriveCycles, initializeDriveCycles } from '../src/storage/driveCycleStorage';
+import { reconcileDriveCycleHistory, initializeDriveCycles } from '../src/storage/driveCycleStorage';
 import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { getAutoSaveState, getAutoSaveStatus, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
 import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
 import { createLearningProfile, initializeCarScannerSeed, readLearningProfile } from '../src/database/learningProfile';
-import { readAppSettings, type AppSettings } from '../src/database/appSettings';
+import { DEFAULT_SETTINGS, readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../src/obd/sharedConnection';
 import { autoTripService, type AutoTripServiceState } from '../src/trip/autoTripService';
 import { loadCurrentConditions, type CurrentConditions } from '../src/weather/currentConditions';
@@ -103,29 +103,37 @@ export default function IndexScreen() {
     const basePath = `${FileSystem.documentDirectory}MERIVA_SMART`;
     try {
       const nextSettings = await readAppSettings(basePath);
-      const restored = await initAutoSave(basePath);
-      await initializeDriveCycles(basePath);
-      await ensureMerivaVehicleProfile(basePath);
-      const learningProfile = await readLearningProfile(basePath);
-      if (!learningProfile) await createLearningProfile(basePath, '2026-09-24T14:48:00.000Z');
-      await initializeCarScannerSeed(basePath);
-      const storedCycles = await readDriveCycles(basePath);
-      const loaded = restored.driveCycles.length ? restored.driveCycles : storedCycles;
-
-      if (!restored.driveCycles.length && loaded.length) {
-        updateAutoSaveState((state) => {
-          state.driveCycles = loaded;
-        });
-      }
-
       setSettings(nextSettings);
-      setCycles(loaded);
+      const restored = await initAutoSave(basePath);
+      try { await initializeDriveCycles(basePath); }
+      catch (cause) { console.warn('[startup] histórico indisponível:', cause instanceof Error ? cause.message : String(cause)); }
+      try { await ensureMerivaVehicleProfile(basePath); }
+      catch (cause) { console.warn('[startup] perfil preservado sem alteração:', cause instanceof Error ? cause.message : String(cause)); }
+      try {
+        const learningProfile = await readLearningProfile(basePath);
+        if (!learningProfile) await createLearningProfile(basePath, '2026-09-24T14:48:00.000Z');
+        await initializeCarScannerSeed(basePath);
+      } catch (cause) {
+        console.warn('[startup] aprendizado indisponível; OBD permanece independente:', cause instanceof Error ? cause.message : String(cause));
+      }
+      let loaded = [] as typeof restored.driveCycles;
+      try {
+        loaded = await reconcileDriveCycleHistory(basePath, restored.driveCycles);
+        updateAutoSaveState((state) => { state.driveCycles = loaded; });
+      } catch (cause) {
+        console.warn('[startup] histórico canônico preservado, sem reconciliação:', cause instanceof Error ? cause.message : String(cause));
+      }
+      setCycles(loaded.filter((cycle) => cycle.source === 'REAL_OBD'));
       setConnectionStatus(getSharedObdStatus());
       setObd({ ...restored.obd, connected: getSharedObdStatus().ecuConnected });
       setSaveStatus(getAutoSaveStatus());
       setIsHydrated(true);
-    } catch {
+    } catch (cause) {
+      console.warn('[startup] falha na hidratação principal:', cause instanceof Error ? cause.message : String(cause));
       setSaveStatus(getAutoSaveStatus());
+      setCycles([]);
+      setConnectionStatus(getSharedObdStatus());
+      setSettings((current) => current ?? DEFAULT_SETTINGS);
       setIsHydrated(true);
     }
   }, []);

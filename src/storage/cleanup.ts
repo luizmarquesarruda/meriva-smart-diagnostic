@@ -1,45 +1,49 @@
 import * as FileSystem from 'expo-file-system';
+import { isExpiredCleanupFile } from './cleanupPolicy';
+import { flushCsvLogs, getActiveCsvLogPaths } from '../database/csvLogger';
 
-export async function cleanupOldLogs(basePath: string, retentionDays = 7): Promise<number> {
-  const logsDir = `${basePath}/LOGS`;
-  const info = await FileSystem.getInfoAsync(logsDir);
-  if (!info.exists) return 0;
-
-  const files = await FileSystem.readDirectoryAsync(logsDir);
-  const now = Date.now();
-  const cutoff = now - retentionDays * 24 * 60 * 60 * 1000;
-  let removed = 0;
-
-  for (const file of files) {
-    const filePath = `${logsDir}/${file}`;
-    const fileInfo = await FileSystem.getInfoAsync(filePath);
-    if ('modificationTime' in fileInfo && fileInfo.modificationTime && fileInfo.modificationTime * 1000 < cutoff) {
-      await FileSystem.deleteAsync(filePath);
-      removed++;
-    }
-  }
-
-  return removed;
+export interface CleanupResult {
+  removed: number;
+  failed: number;
 }
 
-export async function cleanupOldReadings(basePath: string, retentionDays = 30): Promise<number> {
-  const readingsDir = `${basePath}/LEITURAS`;
-  const info = await FileSystem.getInfoAsync(readingsDir);
-  if (!info.exists) return 0;
-
-  const files = await FileSystem.readDirectoryAsync(readingsDir);
-  const now = Date.now();
-  const cutoff = now - retentionDays * 24 * 60 * 60 * 1000;
-  let removed = 0;
-
-  for (const file of files) {
-    const filePath = `${readingsDir}/${file}`;
-    const fileInfo = await FileSystem.getInfoAsync(filePath);
-    if ('modificationTime' in fileInfo && fileInfo.modificationTime && fileInfo.modificationTime * 1000 < cutoff) {
-      await FileSystem.deleteAsync(filePath);
-      removed++;
-    }
+async function cleanupDirectory(basePath: string, directory: 'LOGS' | 'LEITURAS'): Promise<CleanupResult> {
+  const directoryPath = `${basePath}/${directory}`;
+  await flushCsvLogs();
+  const protectedPaths = new Set(getActiveCsvLogPaths());
+  const result: CleanupResult = { removed: 0, failed: 0 };
+  let files: string[];
+  try {
+    const info = await FileSystem.getInfoAsync(directoryPath);
+    if (!info.exists) return result;
+    files = await FileSystem.readDirectoryAsync(directoryPath);
+  } catch {
+    result.failed += 1;
+    return result;
   }
 
-  return removed;
+  const now = Date.now();
+  for (const file of files) {
+    const filePath = `${directoryPath}/${file}`;
+    try {
+      if (protectedPaths.has(filePath)) continue;
+      const fileInfo = await FileSystem.getInfoAsync(filePath);
+      if (fileInfo.exists && typeof fileInfo.modificationTime === 'number'
+          && isExpiredCleanupFile(directory, fileInfo.modificationTime * 1000, now)) {
+        await FileSystem.deleteAsync(filePath, { idempotent: true });
+        result.removed += 1;
+      }
+    } catch {
+      result.failed += 1;
+    }
+  }
+  return result;
+}
+
+export function cleanupOldLogs(basePath: string): Promise<CleanupResult> {
+  return cleanupDirectory(basePath, 'LOGS');
+}
+
+export function cleanupOldReadings(basePath: string): Promise<CleanupResult> {
+  return cleanupDirectory(basePath, 'LEITURAS');
 }

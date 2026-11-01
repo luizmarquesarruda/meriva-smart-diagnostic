@@ -97,7 +97,7 @@ export function formatAutoSaveTxt(state: MerivaPersistedState, options: ExportTx
           .filter((cycle) => cycle.source === 'REAL_OBD')
           .slice(-Math.floor(options.historyLimit));
   if (options.historyLimit != null) {
-    L.push(`Exibindo até as últimas ${Math.max(0, Math.floor(options.historyLimit))} viagens reais; histórico completo preservado no autosave JSON.`);
+    L.push(`Exibindo até as últimas ${Math.max(0, Math.floor(options.historyLimit))} viagens reais; histórico completo preservado em VIAGENS/index.json.`);
   }
   if (displayedCycles.length) {
     for (const cycle of displayedCycles) {

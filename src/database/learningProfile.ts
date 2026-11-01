@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system';
+import { readJsonWithRecovery, writeJsonAtomically } from '../storage/atomicJsonFile';
 import type {
   ConfidenceLevel,
   SampleStatistics,
@@ -15,6 +16,7 @@ export interface ContextualStatistics {
 }
 
 export interface MerivaLearningProfile {
+  schemaVersion?: number;
   vehicleId: string;
   profileCreated: string;
   lastUpdated: string;
@@ -121,19 +123,36 @@ function updateStatisticsWithRealSample(
   existing.source = Array.from(new Set([...existing.source, 'REAL_OBD']));
 }
 
+function isLearningProfileDocument(value: unknown): value is MerivaLearningProfile {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const raw = value as Partial<MerivaLearningProfile> & { schemaVersion?: unknown };
+  return (raw.schemaVersion === undefined || raw.schemaVersion === 1)
+    && typeof raw.vehicleId === 'string'
+    && typeof raw.profileCreated === 'string'
+    && typeof raw.lastUpdated === 'string'
+    && typeof raw.seedVersion === 'string'
+    && typeof raw.seedImportDate === 'string'
+    && Array.isArray(raw.contextualData)
+    && Boolean(raw.overallStatistics && typeof raw.overallStatistics === 'object' && !Array.isArray(raw.overallStatistics))
+    && Boolean(raw.globalSampleCounts && typeof raw.globalSampleCounts === 'object')
+    && Number.isFinite(raw.globalSampleCounts?.realSamples)
+    && Number.isFinite(raw.globalSampleCounts?.seedSamples)
+    && Number.isFinite(raw.globalSampleCounts?.totalSamples)
+    && (raw.source === 'HYBRID' || raw.source === 'REAL_ONLY')
+    && Number.isFinite(raw.seedWeight);
+}
+
+function isFutureLearningProfile(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const version = (value as { schemaVersion?: unknown }).schemaVersion;
+  return typeof version === 'number' && Number.isInteger(version) && version > 1;
+}
+
 async function readLearningProfileUnsafe(
   basePath: string,
 ): Promise<MerivaLearningProfile | null> {
-  const target = profilePath(basePath);
-  const info = await FileSystem.getInfoAsync(target);
-  if (!info.exists || info.isDirectory) return null;
-
-  try {
-    const content = await FileSystem.readAsStringAsync(target);
-    return JSON.parse(content) as MerivaLearningProfile;
-  } catch {
-    return null;
-  }
+  const result = await readJsonWithRecovery(profilePath(basePath), isLearningProfileDocument, isFutureLearningProfile);
+  return result.value ?? null;
 }
 
 async function writeLearningProfileUnsafe(
@@ -142,9 +161,7 @@ async function writeLearningProfileUnsafe(
 ): Promise<void> {
   const target = profilePath(basePath);
   await FileSystem.makeDirectoryAsync(`${basePath}/APRENDIZADO`, { intermediates: true });
-  await FileSystem.writeAsStringAsync(target, JSON.stringify(profile, null, 2), {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+  await writeJsonAtomically(target, { ...profile, schemaVersion: 1 }, isLearningProfileDocument, isFutureLearningProfile);
 }
 
 async function enqueueProfileTransaction<T>(

@@ -100,9 +100,9 @@ async function appendAutoSaveHistoryUnsafe(
   }, 0);
   const nextNumber = lastNumber + 1;
   const exportedAt = new Date().toISOString();
-  // The JSON autosave remains the complete source of truth. Repeating every
-  // trip in each of 200 TXT snapshots caused quadratic file growth; keep only
-  // the ten most recent REAL_OBD trips in this diagnostic snapshot history.
+  // The canonical trip index remains the source of truth. Repeating the full trip
+  // history in autosave JSON and in each of 200 TXT snapshots caused quadratic
+  // file growth; keep only the ten most recent REAL_OBD trips per TXT snapshot.
   const snapshot = formatAutoSaveTxt(state, { appVersion, exportedAt, historyLimit: 10 });
   const entry = [
     ENTRY_BEGIN,
