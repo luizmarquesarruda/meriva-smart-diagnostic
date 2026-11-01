@@ -5,6 +5,7 @@
 - CI/Android: publica o APK standalone e SHA-256 em `main` e em PRs originadas no próprio repositório; PRs de forks não publicam artefatos. Retenção de 14 dias, sem Release automática.
 - Persistência JSON: atualiza regressões para exigir erro explícito em leitura direta de perfil corrompido e fallback de interface somente em memória, sem sobrescrever arquivos corrompidos ou schemas futuros.
 - Bluetooth: atualiza o teste de retry para validar a implementação limitada em `bluetoothManager.ts` e a reutilização da lista de pareados durante a varredura.
+- Bluetooth Classic: o fallback de protocolo registra início, resposta `ATSPx`, nova sonda `010C` e resumo por tentativa, sem alterar ordem, retries, timeouts ou gate de ECU.
 - CI: o gate de baseline valida a publicação de APK na `main` e em PRs do mesmo repositório, sem exigir visibilidade privada nem permitir upload de forks.
 
 
@@ -15,7 +16,9 @@
 - CSVs diários de telemetria giram em partes de 512 KiB; filas grandes são persistidas em chunks CSV verificados em vez de descartar imediatamente as amostras.
 - O overflow CSV agora vira segmentos canônicos `.csv`/`.part-NNNN.csv`; cada chunk é validado em arquivo temporário antes da movimentação para o nome final, com enumeração das partes disponível após reinício.
 - O spool une as colunas presentes no lote e limita cada chunk por bytes (além do limite de linhas), evitando omissão de campos e segmentos de overflow acima de 512 KiB.
+- Arquivos `.queue-*` gravados por versões anteriores continuam sendo enumerados e consultados pela deduplicação; a aplicação não os apaga nem os renomeia automaticamente.
 - SQLite não foi introduzido nesta etapa: a decisão continua condicionada a medir no aparelho volume, latência, concorrência, consultas e restauração antes de migrar dados existentes.
+- Benchmark JSON: falhas de leitura de diretórios ou tamanhos desconhecidos agora cancelam a medição; o arquivo principal é validado pelo leitor canônico, comparado byte a byte durante as sete rodadas, e a medição pausa o polling OBD. O scratch é exclusivo e sua remoção é verificada.
 
 ### GPS / background location
 - Corrigido o fixture de recuperação para respeitar o timestamp estritamente crescente após amostras com precisão desconhecida.
