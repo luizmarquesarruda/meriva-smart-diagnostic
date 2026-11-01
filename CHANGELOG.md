@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Bluetooth: atualiza o teste de retry para validar a implementação limitada em `bluetoothManager.ts` e a reutilização da lista de pareados durante a varredura.
 - CI: alinha o gate de baseline à política de APK público somente na `main`, sem exigir repositório privado, e valida a retenção de 14 dias.
 
 - CI: mantém a publicação do APK standalone e do SHA-256 como artefato somente na branch main, inclusive no repositório público, com retenção de 14 dias; PRs continuam compilando e verificando sem publicar artefatos.

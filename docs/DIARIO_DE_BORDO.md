@@ -1,5 +1,6 @@
 ## ESTADO VIGENTE — 2026-10-31 (P0/P1 robustez de viagens, JSON, backup, Bluetooth e GPS)
 
+- DB-200 — Teste Bluetooth atualizado para verificar retries limitados no `bluetoothManager` e uma única descoberta de pareados por varredura; não foi alterada a lógica de conexão.
 - DB-199 — Gate de baseline alinhado à política de APK público: exige upload somente na `main`, não exige visibilidade privada e confere retenção de 14 dias.
 - A execução de PR continua validando TypeScript, testes e build Android sem publicar o APK; nenhum Release automático ou permissão de escrita foi adicionado.
 - DB-198 — Política de artefato CI: compilar e verificar APK em PRs, mas publicar o APK e SHA-256 somente em execuções da branch `main`, com retenção de 14 dias.
@@ -312,6 +313,7 @@
 - **DB-197** · 2026-10-31 — Endurecer finalização de viagens, persistência JSON, backup, Bluetooth e GPS
 - **DB-198** · 2026-10-31 — Preservar artefato APK público somente na main
 - **DB-199** · 2026-10-31 — Alinhar gate de CI à política do APK público
+- **DB-200** · 2026-10-31 — Sincronizar teste de retry Bluetooth com o ponto real de implementação
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -5083,3 +5085,11 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 ### Validação
 - Corrigidos teste, changelog e este diário no mesmo commit para evitar execuções intermediárias da CI.
 - A CI deve confirmar `gate:baseline`, `validate` e `android-build` no SHA final. Até esses jobs terminarem, a PR não deve ser mesclada.
+
+## DB-200 · 2026-10-31 — Sincronizar teste de retry Bluetooth com o ponto real de implementação
+
+- O teste antigo procurava comentários sobre três tentativas, intervalo de 1,5 s e mesma varredura dentro de `sharedConnection.ts`, embora a implementação do retry estivesse em `bluetoothManager.ts`.
+- O teste agora verifica o loop limitado por `effectiveMaxAttempts`, a espera configurada entre falhas transitórias, a interrupção em erro terminal e o retorno imediato após sucesso.
+- Também confirma que `sharedConnection.ts` descobre os dispositivos pareados uma vez, constrói a lista de candidatos com esse snapshot e executa a fila sem repetir a descoberta.
+- Nenhum comportamento de conexão ou limite de retry foi alterado; somente as expectativas desatualizadas do teste foram alinhadas ao código existente.
+- A CI deve repetir gate:baseline, TypeScript, suíte completa e build Android no novo SHA. Não mesclar antes da validação completa.

@@ -31,9 +31,27 @@ assert(manager.includes('bluetoothConfig.initialization.optionalCommandTimeoutMs
 assert(manager.includes('bluetoothConfig.initialization.protocolSelectionTimeoutMs'));
 
 const sharedConnection = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'sharedConnection.ts'), 'utf8');
-assert(sharedConnection.includes('três tentativas'));
-assert(sharedConnection.includes('1,5 s entre falhas transitórias'));
-assert(sharedConnection.includes('mesma varredura'));
+// Retry is implemented in bluetoothManager; assert the actual bounded loop rather than comments in sharedConnection.
+const sessionRetryImplementation = manager.slice(
+  manager.indexOf('export async function createRealElmSession('),
+  manager.indexOf('async function createRealElmSessionAttempt('),
+);
+assert(sessionRetryImplementation.includes('for (let attempt = 1; attempt <= effectiveMaxAttempts; attempt++)'),
+  'ELM session attempts must be bounded by the configured maximum');
+assert(sessionRetryImplementation.includes('await new Promise((resolve) => setTimeout(resolve, BLUETOOTH_RETRY_INTERVAL_MS))'),
+  'transient ELM failures must wait the configured retry interval');
+assert(sessionRetryImplementation.includes('if (!shouldRetryElmSessionAttempt(cause))'),
+  'terminal ELM failures must stop retries');
+assert(sessionRetryImplementation.includes('if (attempt === effectiveMaxAttempts)'),
+  'the retry loop must stop at the configured maximum');
+assert(sessionRetryImplementation.includes('return session;'),
+  'the first successful ELM session must stop further attempts');
+assert(sharedConnection.includes('const devices = await discoverPairedDevices()'),
+  'a connection sweep must discover paired devices once');
+assert(sharedConnection.includes('const candidates = buildCandidateList(devices, preferredAddress, selectionMode)'),
+  'candidate retries must reuse the current paired-device snapshot');
+assert(sharedConnection.includes('runConnectionCandidates(candidates, isCurrent'),
+  'candidate fallback must operate on the single discovered snapshot');
 assert(!sharedConnection.includes('while (!active)'), 'sharedConnection não deve repetir rodadas infinitamente após esgotar os candidatos');
 const exporter = fs.readFileSync(path.join(ROOT, 'src', 'obd', 'exportBluetoothDiagnosticTxt.ts'), 'utf8');
 assert(exporter.includes('readLearningProfile'));
