@@ -29,6 +29,15 @@ mod.paths = Module._nodeModulePaths(path.dirname(sourcePath));
 const originalLoad = Module._load;
 Module._load = function(request, parent, isMain) {
   if (request === 'expo-file-system') return fakeFs;
+  if (request === './cleanupPolicy') {
+    return {
+      isExpiredCleanupFile: (_directory, modifiedAtMs, now) =>
+        Number.isFinite(modifiedAtMs) && modifiedAtMs > 0 && modifiedAtMs < now - 7 * 86400000,
+    };
+  }
+  if (request === '../database/csvLogger') {
+    return { flushCsvLogs: async () => undefined, getActiveCsvLogPaths: () => [] };
+  }
   return originalLoad.call(this, request, parent, isMain);
 };
 try { mod._compile(output, sourcePath); } finally { Module._load = originalLoad; }
