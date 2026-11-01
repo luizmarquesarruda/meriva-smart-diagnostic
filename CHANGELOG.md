@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CI: mantém a publicação do APK standalone e do SHA-256 como artefato somente na branch main, inclusive no repositório público, com retenção de 14 dias; PRs continuam compilando e verificando sem publicar artefatos.
+
 ### Histórico, autosave e logs CSV
 - `VIAGENS/index.json` passa a ser a única fonte persistente de viagens; inicialização deduplica por ID, preserva a viagem com telemetria mais completa e reconcilia registros de autosaves antigos.
 - Novos autosaves não duplicam o histórico completo de viagens; a memória de runtime continua hidratada para as telas e relatórios.

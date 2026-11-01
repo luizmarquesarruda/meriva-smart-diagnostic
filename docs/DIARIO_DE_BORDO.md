@@ -1,5 +1,7 @@
 ## ESTADO VIGENTE — 2026-10-31 (P0/P1 robustez de viagens, JSON, backup, Bluetooth e GPS)
 
+- DB-198 — Política de artefato CI: compilar e verificar APK em PRs, mas publicar o APK e SHA-256 somente em execuções da branch `main`, com retenção de 14 dias.
+- A alteração reconcilia a regra de upload com a decisão de manter o artefato público sem criar Releases automáticas nem publicar APKs de branches de trabalho.
 - DB-197 — Branch de integração: `fix/storage-and-history-integrity-20261031`, sobre o estado de `main` documentado em 31/10/2026. Escopo ampliado para preservar viagens pendentes, endurecer JSON local, coordenar snapshots, cancelar descoberta Bluetooth e manter GPS foreground em falha de background.
 - A finalização de uma viagem só libera o gravador após índice JSON, resumo CSV idempotente e checkpoint do autosave serem confirmados. Falha mantém a viagem pendente e bloqueia novas amostras para não misturar sessões.
 - Backup/restauração passam a pausar e drenar o ciclo OBD, confirmar autosave, descarregar aprendizado e CSV antes da cópia/substituição. Configurações, veículo, manutenção e aprendizado passam a usar gravação JSON temporária validada e cópia anterior; corrupção sem recuperação não é substituída por padrões.
@@ -306,6 +308,7 @@
 - **DB-195** · 2026-10-31 — Instrumentação de tamanho e latência do histórico no aparelho
 - **DB-196** · 2026-10-31 — Versionamento do índice de viagens e observabilidade dos buffers
 - **DB-197** · 2026-10-31 — Endurecer finalização de viagens, persistência JSON, backup, Bluetooth e GPS
+- **DB-198** · 2026-10-31 — Preservar artefato APK público somente na main
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -5051,3 +5054,17 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - **Regressões adicionadas:** falha ao persistir viagem não chama a liberação do gravador; JSON futuro não é substituído; manutenção preserva mais de 100 abastecimentos; Bluetooth não avança ao próximo candidato após cancelamento; GPS mantém watcher foreground se o serviço background falhar; backup exige barreira de snapshot.
 - **Validação:** as alterações e os testes foram preparados sem disparar CI. A segunda auditoria estática deve anteceder a execução da CI na cabeça final. Este registro não declara teste local, build Android ou ensaio físico concluído.
 - **SQLite:** permanece sem migração. A decisão continua condicionada à medição real de JSON e à comparação equivalente com SQLite no Galaxy A06, conforme DB-195.
+
+
+## DB-198 · 2026-10-31 — Preservar artefato APK público somente na main
+
+### Decisão e alteração
+- O workflow continua executando validate e android-build nas pull requests.
+- O APK standalone e seu checksum SHA-256 são enviados como artefato somente quando github.ref == refs/heads/main; nenhum APK é publicado a partir de branches de trabalho ou PRs.
+- A retenção do artefato foi alinhada para 14 dias, conforme a decisão operacional de manter o download público do artefato da branch principal.
+- Não há criação de GitHub Release automática nem concessão de permissões de escrita ao workflow.
+
+### Validação
+- Esta alteração foi preparada na branch fix/storage-and-history-integrity-20261031 para disparar a CI sobre o novo HEAD.
+- A aprovação depende de gate:baseline, validate e android-build verdes no SHA resultante. Nenhum resultado é presumido.
+- A distribuição pública depende de uma execução posterior em main; a execução de PR deve apenas compilar e verificar o APK.
