@@ -336,15 +336,75 @@ async function createRealElmSessionAttempt(
 
     const protocolFallbacks = ELM_PROTOCOL_FALLBACKS;
     let successfulForcedProtocol: string | null = null;
+    const protocolFallbackAttempts: Array<{
+      protocol: string;
+      atspStatus: ElmCommandResult['status'];
+      atspElapsedMs: number;
+      ecuStatus?: ElmCommandResult['status'];
+      ecuElapsedMs?: number;
+      ecuResponse?: string;
+      ecuValidated: boolean;
+    }> = [];
 
     for (const protocol of protocolFallbacks) {
       if (probeIsValid) break;
+      logBluetoothDiagnostic('ELM_PROTOCOL_FALLBACK_START', {
+        attempt,
+        protocol,
+        protocolName: getElmProtocolName(protocol),
+        previousEcuStatus: ecuProbe.status,
+        previousEcuResponse: ecuProbe.response || 'N/D',
+      });
+
       const forcedProtocol = await session.executeCommand(`ATSP${protocol}`);
-      if (forcedProtocol.status !== 'OK') continue;
-      ecuProbe = await session.executeCommand('010C');
-      probeIsValid = isValidEcuProbe(ecuProbe);
-      if (probeIsValid) successfulForcedProtocol = protocol;
+      const fallbackAttempt: typeof protocolFallbackAttempts[number] = {
+        protocol,
+        atspStatus: forcedProtocol.status,
+        atspElapsedMs: forcedProtocol.elapsedMs,
+        ecuValidated: false,
+      };
+      logBluetoothDiagnostic('ELM_PROTOCOL_FALLBACK_SET_RESULT', {
+        attempt,
+        protocol,
+        protocolName: getElmProtocolName(protocol),
+        command: forcedProtocol.command,
+        status: forcedProtocol.status,
+        elapsedMs: forcedProtocol.elapsedMs,
+        response: forcedProtocol.response || 'N/D',
+      });
+
+      if (forcedProtocol.status === 'OK') {
+        ecuProbe = await session.executeCommand('010C');
+        probeIsValid = isValidEcuProbe(ecuProbe);
+        fallbackAttempt.ecuStatus = ecuProbe.status;
+        fallbackAttempt.ecuElapsedMs = ecuProbe.elapsedMs;
+        fallbackAttempt.ecuResponse = ecuProbe.response || 'N/D';
+        fallbackAttempt.ecuValidated = probeIsValid;
+        logBluetoothDiagnostic('ELM_PROTOCOL_FALLBACK_ECU_PROBE_RESULT', {
+          attempt,
+          protocol,
+          protocolName: getElmProtocolName(protocol),
+          command: ecuProbe.command,
+          status: ecuProbe.status,
+          elapsedMs: ecuProbe.elapsedMs,
+          response: ecuProbe.response || 'N/D',
+          parsedStatus: ecuProbe.status === 'OK' ? parsePidResponse('010C', ecuProbe.response).status : 'N/D',
+          ecuValidated: probeIsValid,
+        });
+        if (probeIsValid) successfulForcedProtocol = protocol;
+      }
+
+      protocolFallbackAttempts.push(fallbackAttempt);
     }
+
+    logBluetoothDiagnostic('ELM_PROTOCOL_FALLBACK_SUMMARY', {
+      attempt,
+      initialEcuProbeValid: isValidEcuProbe(protocolFallbackAttempts.length > 0
+        ? { ...ecuProbe, status: ecuProbe.status }
+        : ecuProbe),
+      attempts: protocolFallbackAttempts,
+      successfulProtocol: successfulForcedProtocol,
+    });
 
     if (!probeIsValid) {
       throw new Error(`ECU NÃO RESPONDEU AO 010C: ${ecuProbe.status} | RX=${ecuProbe.response || 'N/D'}`);
