@@ -333,6 +333,7 @@ async function createRealElmSessionAttempt(
     let ecuProbe = await session.executeCommand('010C');
     logBluetoothDiagnostic('ECU_PROBE_RESULT', { status: ecuProbe.status, response: ecuProbe.response, attempt });
     let probeIsValid = isValidEcuProbe(ecuProbe);
+    const initialEcuProbeValid = probeIsValid;
 
     const protocolFallbacks = ELM_PROTOCOL_FALLBACKS;
     let successfulForcedProtocol: string | null = null;
@@ -399,9 +400,7 @@ async function createRealElmSessionAttempt(
 
     logBluetoothDiagnostic('ELM_PROTOCOL_FALLBACK_SUMMARY', {
       attempt,
-      initialEcuProbeValid: isValidEcuProbe(protocolFallbackAttempts.length > 0
-        ? { ...ecuProbe, status: ecuProbe.status }
-        : ecuProbe),
+      initialEcuProbeValid,
       attempts: protocolFallbackAttempts,
       successfulProtocol: successfulForcedProtocol,
     });
