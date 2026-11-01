@@ -235,6 +235,7 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
         runtime.state.metadata?.appVersion ?? 'N/D',
         reason,
       );
+      clearStorageHealthIssue('AUTOSAVE_TXT_FAILED', 'CONFIG/meriva_smart_autosave_history.txt');
     } catch (historyCause) {
       const detail = historyCause instanceof Error ? historyCause.message : String(historyCause);
       recordStorageHealthIssue('AUTOSAVE_TXT_FAILED', 'Falha no histórico TXT de autosave', detail, 'warning', 'CONFIG/meriva_smart_autosave_history.txt');
@@ -453,6 +454,7 @@ async function appendDailySessionBoundary(event: 'SESSION_START' | 'SESSION_END'
       event,
       new Date().toISOString(),
     );
+    clearStorageHealthIssue('DAILY_TXT_FAILED', 'VIAGENS/meriva_smart_daily_obd_history.txt');
   } catch (cause) {
     // O histórico diário é complementar: falha no TXT não invalida o autosave JSON.
     const detail = cause instanceof Error ? cause.message : String(cause);
