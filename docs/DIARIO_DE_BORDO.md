@@ -321,6 +321,7 @@
 - **DB-202** · 2026-10-31 — Publicar artefato APK nas PRs do próprio repositório
 - **DB-203** · 2026-11-01 — Corrigir compilação do logger CSV e isolamento dos testes de limpeza
 - **DB-204** · 2026-11-01 — Tornar o overflow CSV recuperável como segmentos canônicos após reinício
+- **DB-205** · 2026-11-01 — Instrumentar diagnóstico por tentativa no fallback de protocolo ELM
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -5129,9 +5130,20 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 
 - A auditoria da PR #109 identificou que `spillPendingCsvRows` gravava arquivos `.queue-*`, mas o leitor/enumeração de segmentos e a deduplicação do histórico não os consumiam. Isso deixava linhas persistidas fisicamente sem integração ao fluxo normal após reinício; não foi classificado como perda física comprovada.
 - O overflow agora grava segmentos CSV canônicos: o primeiro usa o nome diário legado e os seguintes seguem `.part-NNNN.csv`. A gravação ocorre em arquivo temporário, com leitura de retorno, validação de cabeçalho/quantidade e limite de bytes antes de mover o arquivo ao nome final.
+- A gravação normal também pré-calcula o tamanho UTF-8 do segmento completo. Quando um lote excederia 512 KiB, uma nova parte é criada sem reescrever a parte anterior; a leitura do diretório para alocação de uma nova parte falha explicitamente em vez de assumir diretório vazio.
 - Os chunks usam a união das colunas do lote e respeitam simultaneamente o limite de linhas e o limite de 512 KiB. A fila de novas amostras continua serializada por caminho, e o restante pendente é descarregado após a conclusão do spill.
 - `getCsvLogSegments` enumera as partes persistidas após reinício; `appendCsvRowIfMissing` continua verificando todas as partes antes de inserir resumos idempotentes. O contador `durablySpooledRows` é explicitamente uma métrica em memória por execução, não um contador persistente.
 - Adicionado `tests/csvSpoolDurability.test.js`, cobrindo segmentos canônicos, colunas variáveis, limite por bytes, enumeração após novo carregamento do módulo e ausência de duplicação. O teste foi incluído em `npm test` e no gate `projectBaseline`.
 - Alinhado o nome do artefato APK com a PR #110 (`meriva-smart-diagnostic-standalone-apk-*`) e removida do changelog a afirmação obsoleta de que PRs do próprio repositório não publicam artefatos.
-- Commits de implementação e cobertura: `b734c197fa74ee241ab0f49cb3e31e34eb466054`, `0550e48a305d9e939874e91692e5b2b80f7591ca`; integração do teste/gate/changelog/workflow em `02e5122aa7f0e090de8ad9a800c8fc690f33615b`, `baec05b6be0a385964b276021243dfbb668fd424`, `db403bde77981ab40c3b12006f2f1793f988b83f` e `49796b2e0c6d7d586bb209e4e7a20bcdb3b0cc42`.
-- A CI completa deve ser repetida no novo HEAD; nenhum resultado é presumido nesta entrada. Nenhum merge ou teste físico no Galaxy A06/ELM327 foi realizado.
+- Commits de implementação e cobertura: `b734c197fa74ee241ab0f49cb3e31e34eb466054`, `0550e48a305d9e939874e91692e5b2b80f7591ca`; integração do teste/gate/changelog/workflow em `02e5122aa7f0e090de8ad9a800c8fc690f33615b`, `baec05b6be0a385964b276021243dfbb668fd424`, `db403bde77981ab40c3b12006f2f1793f988b83f`, `49796b2e0c6d7d586bb209e4e7a20bcdb3b0cc42`, `5b725590fa847390a62c226eea4a4b6125d34d1c`, `8c941ad1dc137a402789469b6a27ee7aa6d76a1e`, `d8f7fec4942b3d120dd21ec718e767f7545fd666` e `8d0ffce8df60375df894ad4dbd7ffcd9c460e3d7`.
+- A execução anterior da CI foi cancelada após novos commits alterarem a branch; o HEAD `8d0ffce8df60375df894ad4dbd7ffcd9c460e3d7` ainda não tem execução/status de CI visível pelo conector. A suíte de testes e o build APK ainda não foram confirmados nesse SHA. Nenhum merge ou teste físico no Galaxy A06/ELM327 foi realizado.
+
+## DB-205 · 2026-11-01 — Instrumentar diagnóstico por tentativa no fallback de protocolo ELM
+
+- A auditoria estática confirmou que a sessão só é aceita como ECU real após `010C` gerar payload válido `41 0C`, interpretado pelo parser com valor numérico finito. A seleção automática de candidatos e a exigência de resposta ECU válida permanecem inalteradas.
+- Foi identificada baixa observabilidade no fallback: antes, a saída de diagnóstico registrava a sonda inicial e o resultado final, mas não separava a resposta de cada `ATSPx` e a resposta `010C` após cada protocolo.
+- `src/obd/bluetoothManager.ts` agora registra `ELM_PROTOCOL_FALLBACK_START`, `ELM_PROTOCOL_FALLBACK_SET_RESULT`, `ELM_PROTOCOL_FALLBACK_ECU_PROBE_RESULT` e `ELM_PROTOCOL_FALLBACK_SUMMARY`, incluindo protocolo, status, resposta RX, duração, resultado do parser e validação ECU.
+- `tests/bluetoothLifecycle.test.js` protege a presença desses eventos; `docs/ELM327_ENGINEERING_PLAYBOOK.md` documenta como interpretar os registros e reforça que `ATSPx = OK` ou Bluetooth conectado não prova ECU funcional.
+- Não houve alteração na ordem dos protocolos alternativos, retries, timeouts, framing, parser ou gate `41 0C`. A instrumentação apenas torna explícita a evidência que falta quando o Galaxy A06 retorna timeout em `010C`.
+- Commits: `2403d762ba85ab5d31dd936492a8268c9dd8c524`, `2bb5472634a59e0e58b9164107cd059818e56494`, `7c8f9c5038b3abba72d1ad1167c0fe36519374fc`, `728ff4c6e1b9a0ad7ba01cc5292f4ce9a7886ee8`.
+- A validação TypeScript/suíte completa/Android build não foi confirmada no HEAD desta branch. O teste físico com Galaxy A06 SM-A065M, Android 16, adaptador ELM327 e a Meriva 1.4 Flex 2011 permanece pendente.
