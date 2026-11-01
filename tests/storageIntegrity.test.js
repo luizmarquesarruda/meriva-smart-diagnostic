@@ -12,6 +12,7 @@ const directories = new Set(['/doc']);
 const csvRows = [];
 const exportFiles = new Map();
 let failMoveTarget = null;
+let failCopyTo = null;
 
 function ensureDirectory(directory) {
   const parts = directory.split('/').filter(Boolean);
@@ -83,6 +84,10 @@ const fakeFileSystem = {
     files.set(filePath, String(value));
   },
   async copyAsync({ from, to }) {
+    if (failCopyTo === to) {
+      failCopyTo = null;
+      throw new Error('SIMULATED_COPY_FAILURE: ' + to);
+    }
     if (files.has(from)) {
       ensureDirectory(parentDirectory(to));
       files.set(to, files.get(from));
@@ -426,6 +431,18 @@ async function main() {
     .find((item) => item.name === legacyRestore.safetyBackupName);
   assert.ok(restoreSafety?.includes.includes('LEITURAS') && restoreSafety.includes.includes('LOGS'),
     'o snapshot de rollback deve preservar também as pastas brutas substituídas por um backup legado');
+
+  files.set(backupBase + '/LEITURAS/historico.csv', 'LEITURAS ATUAIS ANTES DA FALHA');
+  files.set(backupBase + '/LOGS/historico.csv', 'LOGS ATUAIS ANTES DA FALHA');
+  failCopyTo = backupBase + '/LOGS';
+  await assert.rejects(
+    () => backup.restoreBackup(backupBase, legacyName),
+    /RESTORE_FAILED_ROLLED_BACK/,
+  );
+  assert.equal(files.get(backupBase + '/LEITURAS/historico.csv'), 'LEITURAS ATUAIS ANTES DA FALHA',
+    'falha em um diretório deve restaurar LEITURAS do snapshot de segurança');
+  assert.equal(files.get(backupBase + '/LOGS/historico.csv'), 'LOGS ATUAIS ANTES DA FALHA',
+    'falha em um diretório deve restaurar LOGS do snapshot de segurança');
 
   Module._load = originalLoad;
   console.log('storageIntegrity.test.js: PASS');
