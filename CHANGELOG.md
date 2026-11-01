@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Fase 1 — Integridade e armazenamento
+- Novos backups rotineiros deixam de copiar as pastas brutas `LEITURAS` e `LOGS`; manifestos antigos continuam aceitos. A cópia de segurança de uma restauração inclui todos os diretórios que serão substituídos, preservando o rollback de backups legados.
+- O índice de viagens passou a ter schema versionado. JSON corrompido e schema futuro bloqueiam migração/gravação; uma cópia anterior validada pode ser usada somente para leitura, sem substituir o arquivo original.
+- Configurações, perfil do veículo, aprendizado e manutenção passaram a usar leitura com recuperação somente de cópia validada e gravação JSON temporária com validação, cópia anterior e rollback.
+- A Central de Saúde concentra avisos de JSON corrompido, schema futuro, recuperação, falhas TXT, descartes/falhas CSV e limpeza. A tela Armazenamento mantém detalhes operacionais e apresenta BACKUP separadamente.
+- Adicionado benchmark de histórico em sete rodadas, com leitura/parse, escrita temporária, cópia de restauração, volume e exportação TXT. Limiares para investigar SQLite são critérios propostos, não medições; nenhuma migração SQLite foi feita.
+- Testes de integridade adicionados ao `npm test` e ao gate de baseline. Execução de TypeScript/suíte/CI no SHA final: pendente; ensaio no Galaxy A06 com ELM327/ECU: não validado.
+
+
 ### GPS / background location
 - Corrigido o fixture de recuperação para respeitar o timestamp estritamente crescente após amostras com precisão desconhecida.
 - Expandido o mock de Expo Location e incluídos testes de start/stop/reuso da tarefa nativa de localização em segundo plano.

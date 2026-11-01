@@ -26,8 +26,12 @@ interface BackupManifest {
 }
 
 const BACKUP_DATA_DIRS = [
-  'BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'LEITURAS', 'LOGS', 'VIAGENS', 'MANUTENCAO',
+  'BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'VIAGENS', 'MANUTENCAO',
 ] as const;
+// Formato aceito apenas para restaurar snapshots antigos. Novos backups não
+// incluem LEITURAS/LOGS para evitar duplicar CSVs brutos e consumir toda a quota.
+const LEGACY_BACKUP_DATA_DIRS = ['LEITURAS', 'LOGS'] as const;
+const RESTORABLE_BACKUP_DATA_DIRS = [...BACKUP_DATA_DIRS, ...LEGACY_BACKUP_DATA_DIRS];
 const MAX_BACKUPS_TO_KEEP = 5;
 
 async function getDirectorySize(path: string): Promise<number> {
@@ -74,7 +78,7 @@ async function readVerifiedManifest(backupDir: string): Promise<BackupManifest> 
     if (
       !entry ||
       typeof entry.directory !== 'string' ||
-      !(BACKUP_DATA_DIRS as readonly string[]).includes(entry.directory) ||
+      !(RESTORABLE_BACKUP_DATA_DIRS as readonly string[]).includes(entry.directory) ||
       seen.has(entry.directory) ||
       typeof entry.sizeBytes !== 'number' ||
       !Number.isFinite(entry.sizeBytes) ||
@@ -109,7 +113,10 @@ async function pruneOldBackups(basePath: string): Promise<void> {
   }
 }
 
-export async function createBackup(basePath: string): Promise<BackupInfo> {
+async function createBackupSnapshot(
+  basePath: string,
+  dataDirectories: readonly string[] = BACKUP_DATA_DIRS,
+): Promise<BackupInfo> {
   await flushCsvLogs();
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupRoot = `${basePath}/BACKUP`;
@@ -121,7 +128,10 @@ export async function createBackup(basePath: string): Promise<BackupInfo> {
   let totalSize = 0;
 
   try {
-    for (const dir of BACKUP_DATA_DIRS) {
+    for (const dir of dataDirectories) {
+      if (!(RESTORABLE_BACKUP_DATA_DIRS as readonly string[]).includes(dir)) {
+        throw new Error('BACKUP_DIRECTORY_NOT_ALLOWED: ' + dir);
+      }
       const source = `${basePath}/${dir}`;
       const dest = `${backupDir}/${dir}`;
       const info = await FileSystem.getInfoAsync(source);
@@ -162,6 +172,11 @@ export async function createBackup(basePath: string): Promise<BackupInfo> {
     try { await FileSystem.deleteAsync(backupDir, { idempotent: true }); } catch { /* preserve original error */ }
     throw cause;
   }
+}
+
+/** Backups rotineiros excluem CSVs brutos de LEITURAS e LOGS. */
+export async function createBackup(basePath: string): Promise<BackupInfo> {
+  return createBackupSnapshot(basePath, BACKUP_DATA_DIRS);
 }
 
 /** Returns only backups whose manifest and every copied directory still verify. */
@@ -219,7 +234,12 @@ export async function restoreBackup(basePath: string, backupName: string): Promi
       if (stagedSize !== entry.sizeBytes) throw new Error('RESTORE_STAGING_VERIFY_FAILED: ' + entry.directory);
     }
 
-    const safety = await createBackup(basePath);
+    // O snapshot de rollback deve incluir exatamente as pastas que a
+    // restauração selecionada substituirá, inclusive CSVs de backups antigos.
+    const safety = await createBackupSnapshot(
+      basePath,
+      manifest.directories.map((entry) => entry.directory),
+    );
     const safetyBackupName = `meriva_smart_${safety.timestamp}`;
     const safetyDir = `${backupRoot}/${safetyBackupName}`;
     const restored: string[] = [];
@@ -279,7 +299,7 @@ export async function restoreBackup(basePath: string, backupName: string): Promi
       timestamp: manifest.createdAt,
       sizeBytes: manifest.payloadSizeBytes,
       includes: restored,
-      preservedDirectories: BACKUP_DATA_DIRS.filter((dir) =>
+      preservedDirectories: RESTORABLE_BACKUP_DATA_DIRS.filter((dir) =>
         !manifest.directories.some((entry) => entry.directory === dir),
       ),
     };

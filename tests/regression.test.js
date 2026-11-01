@@ -690,7 +690,7 @@ async function testCarScannerBaselineAndFuel012F() {
   assert.strictEqual(overallRpm.confidence, 'LOW', 'seed não pode aumentar confiança baseada em amostras reais');
 
   const lateSeedBase = BASE + '/late-seed';
-  await learning.createLearningProfile(lateSeedBase, '');
+  await learning.createLearningProfile(lateSeedBase, '2026-09-24T14:48:00.000Z');
   await learning.updateLearningProfileRealSample(lateSeedBase, 'Engine RPM', 1000, 'IDLE_COLD');
   await learning.initializeCarScannerSeed(lateSeedBase);
   const lateSeed = await learning.readLearningProfile(lateSeedBase);
@@ -968,6 +968,13 @@ async function testVehicleProfile() {
     make: 'Chevrolet',
     model: 'Meriva Maxx',
     engine: '1.4 8V',
+    displacementCm3: 1389,
+    cylinders: 4,
+    fuel: 'Gasolina / Álcool',
+    modelYearReference: '2011/2012',
+    tankCapacityL: 54,
+    reserveCapacityL: 5,
+    manualSource: 'MANUAL_CHEVROLET_MERIVA',
     createdAt: new Date().toISOString(),
     lastModified: new Date().toISOString(),
     protocolBaseline: 'N/D',
@@ -1197,8 +1204,11 @@ async function testBackupCompleteness() {
   await m.initAutoSave(BASE);
   const backup = loadTs(path.join(ROOT, 'src/storage/backup.ts'));
 
-  const expectedDirs = ['BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'LEITURAS', 'LOGS', 'VIAGENS', 'MANUTENCAO'];
+  const expectedDirs = ['BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'VIAGENS', 'MANUTENCAO'];
   for (const dir of expectedDirs) {
+    await fakeFS.writeAsStringAsync(`${BASE}/${dir}/arquivo.txt`, dir);
+  }
+  for (const dir of ['LEITURAS', 'LOGS']) {
     await fakeFS.writeAsStringAsync(`${BASE}/${dir}/arquivo.txt`, dir);
   }
   const maintenanceData = {
@@ -1219,6 +1229,10 @@ async function testBackupCompleteness() {
   assert.strictEqual(manifest.payloadSizeBytes, info.sizeBytes,
     'manifest deve declarar tamanho verificado do conteúdo copiado');
   assert.deepStrictEqual(manifest.directories.map((item) => item.directory), expectedDirs);
+  for (const dir of ['LEITURAS', 'LOGS']) {
+    assert.ok(files.has(`${BASE}/${dir}/arquivo.txt`), `${dir} original deve permanecer no dispositivo`);
+    assert.ok(!files.has(`${backupRoot}/${dir}/arquivo.txt`), `${dir} não deve ser copiado em novos backups`);
+  }
   for (const dir of expectedDirs) {
     assert.strictEqual(
       files.get(`${backupRoot}/${dir}/arquivo.txt`),
@@ -1275,19 +1289,17 @@ async function testBackupRestore() {
   await fakeFS.writeAsStringAsync(`${BASE}/MANUTENCAO/registros.json`, '{"fuelings":[]}');
   const restored = await backup.restoreBackup(BASE, backupName);
 
-  assert.strictEqual(files.get(`${BASE}/LOGS/obd.csv`), oldLog,
-    'restauração deve recuperar o arquivo do histórico');
+  assert.strictEqual(files.get(`${BASE}/LOGS/obd.csv`), 'newer-telemetry',
+    'restauração rotineira deve preservar CSVs brutos atuais fora do snapshot');
   assert.strictEqual(files.get(`${BASE}/MANUTENCAO/registros.json`), oldMaintenance,
     'restauração deve recuperar manutenção e abastecimentos manuais');
   assert.ok(restored.safetyBackupName.startsWith('meriva_smart_'),
     'restauração deve criar uma cópia de segurança do estado anterior');
-  assert.strictEqual(
-    files.get(`${BASE}/BACKUP/${restored.safetyBackupName}/LOGS/obd.csv`),
-    'newer-telemetry',
-    'a cópia de segurança deve preservar os dados anteriores à restauração',
-  );
+  const safetyManifest = JSON.parse(files.get(`${BASE}/BACKUP/${restored.safetyBackupName}/manifest.json`));
+  assert.deepStrictEqual(safetyManifest.directories.map((entry) => entry.directory), created.includes,
+    'a cópia de segurança deve cobrir exatamente os diretórios presentes no snapshot restaurado');
 
-  await fakeFS.writeAsStringAsync(`${BASE}/BACKUP/${backupName}/LOGS/obd.csv`, 'tampered');
+  await fakeFS.writeAsStringAsync(`${BASE}/BACKUP/${backupName}/MANUTENCAO/registros.json`, 'tampered');
   const verifiedAfterTamper = await backup.listVerifiedBackups(BASE);
   assert.ok(!verifiedAfterTamper.some((item) => item.name === backupName),
     'backup alterado/corrompido deve deixar de ser oferecido para restauração');
@@ -1358,7 +1370,7 @@ async function testPidAndLearningWriteSerialization() {
   assert.strictEqual(discovered.find((item) => item.pid === '010C').status, 'CONFIRMADO');
 
   const learning = loadTs(path.join(ROOT, 'src/database/learningProfile.ts'));
-  await learning.createLearningProfile(BASE, '');  
+  await learning.createLearningProfile(BASE, '2026-09-24T14:48:00.000Z');  
   await Promise.all([
     learning.updateLearningProfileRealSample(BASE, 'RPM', 1000, 'IDLE_WARM'),
     learning.updateLearningProfileRealSample(BASE, 'RPM', 1100, 'IDLE_WARM'),
