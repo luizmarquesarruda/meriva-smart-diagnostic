@@ -55,27 +55,67 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function isSampleStatistics(value: unknown): value is SampleStatistics {
+  if (!isRecord(value)) return false;
+  const finite = (item: unknown): item is number => typeof item === 'number' && Number.isFinite(item);
+  const count = (item: unknown): item is number => Number.isInteger(item) && typeof item === 'number' && item >= 0;
+  return finite(value.mean) && finite(value.median) && finite(value.min) &&
+    finite(value.max) && finite(value.stddev) && value.stddev >= 0 &&
+    count(value.samples) && count(value.realSamples) && count(value.seedSamples) &&
+    ['LOW', 'MEDIUM', 'GOOD', 'HIGH'].includes(String(value.confidence)) &&
+    typeof value.lastUpdate === 'string' && Number.isFinite(Date.parse(value.lastUpdate)) &&
+    Array.isArray(value.source) && value.source.every((item) => typeof item === 'string' && item.length > 0) &&
+    (value.medianWindow === undefined ||
+      (Array.isArray(value.medianWindow) && value.medianWindow.every(finite)));
+}
+
+function isStatisticsRecord(value: unknown): boolean {
+  return isRecord(value) && Object.values(value).every(isSampleStatistics);
+}
+
 function isLearningProfile(value: unknown): value is StoredLearningProfile {
   if (!isRecord(value)) return false;
   if (value.schemaVersion !== undefined &&
       (!Number.isInteger(value.schemaVersion) || (value.schemaVersion as number) < 0)) return false;
   if (typeof value.vehicleId !== 'string' ||
-      typeof value.profileCreated !== 'string' ||
-      typeof value.lastUpdated !== 'string' ||
+      typeof value.profileCreated !== 'string' || !Number.isFinite(Date.parse(value.profileCreated)) ||
+      typeof value.lastUpdated !== 'string' || !Number.isFinite(Date.parse(value.lastUpdated)) ||
       typeof value.seedVersion !== 'string' ||
-      typeof value.seedImportDate !== 'string' ||
+      typeof value.seedImportDate !== 'string' || !Number.isFinite(Date.parse(value.seedImportDate)) ||
       !['COLD_START', 'SEED_INITIALIZED', 'LEARNING_ACTIVE', 'CONFIDENT'].includes(String(value.learningStatus)) ||
       !Array.isArray(value.contextualData) ||
-      !isRecord(value.overallStatistics) ||
+      !isStatisticsRecord(value.overallStatistics) ||
       !isRecord(value.globalSampleCounts) ||
       !isRecord(value.confidenceThresholds) ||
       !isRecord(value.dataContamination) ||
       !['HYBRID', 'REAL_ONLY'].includes(String(value.source)) ||
-      typeof value.seedWeight !== 'number' || !Number.isFinite(value.seedWeight)) return false;
+      typeof value.seedWeight !== 'number' || !Number.isFinite(value.seedWeight) ||
+      value.seedWeight < 0 || value.seedWeight > 1) return false;
+
   const counts = value.globalSampleCounts;
-  return typeof counts.seedSamples === 'number' && Number.isFinite(counts.seedSamples) &&
-    typeof counts.realSamples === 'number' && Number.isFinite(counts.realSamples) &&
-    typeof counts.totalSamples === 'number' && Number.isFinite(counts.totalSamples);
+  const thresholds = value.confidenceThresholds;
+  const contamination = value.dataContamination;
+  const isCount = (item: unknown): item is number =>
+    typeof item === 'number' && Number.isInteger(item) && item >= 0;
+  const isThreshold = (item: unknown): item is number =>
+    typeof item === 'number' && Number.isFinite(item) && item >= 0;
+
+  if (!isCount(counts.seedSamples) || !isCount(counts.realSamples) ||
+      !isCount(counts.totalSamples) ||
+      counts.totalSamples !== counts.seedSamples + counts.realSamples ||
+      !isThreshold(thresholds.low) || !isThreshold(thresholds.medium) ||
+      !isThreshold(thresholds.good) || !isThreshold(thresholds.high) ||
+      !isCount(contamination.simulationDetected) ||
+      !isCount(contamination.simulationFiltered)) return false;
+
+  const validConditions = ['IDLE_COLD', 'IDLE_WARM', 'ACCELERATION', 'CRUISE', 'DECELERATION', 'UNKNOWN'];
+  return value.contextualData.every((context) =>
+    isRecord(context) &&
+    validConditions.includes(String(context.condition)) &&
+    typeof context.lastUpdate === 'string' && Number.isFinite(Date.parse(context.lastUpdate)) &&
+    isCount(context.sampleCount) &&
+    isStatisticsRecord(context.statistics),
+  );
 }
 
 function hasFutureLearningProfileSchema(value: unknown): boolean {
