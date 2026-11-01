@@ -317,13 +317,13 @@ interface CsvSpoolChunk {
 function buildCsvSpoolChunks(rows: CsvRow[]): CsvSpoolChunk[] {
   if (rows.length === 0) return [];
   const headers = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
-  const headerLine = `${headers.join(',')}\\n`;
+  const headerLine = `${headers.join(',')}\n`;
   const chunks: CsvSpoolChunk[] = [];
   let chunkRows: CsvRow[] = [];
   let content = headerLine;
 
   for (const row of rows) {
-    const serialized = `${serializeRow(row, headers)}\\n`;
+    const serialized = `${serializeRow(row, headers)}\n`;
     if (chunkRows.length > 0 && (
       chunkRows.length >= SPILL_CHUNK_ROWS
       || utf8ByteLength(content + serialized) > MAX_CSV_SEGMENT_BYTES
@@ -469,64 +469,6 @@ async function spillPendingCsvRows(): Promise<void> {
   }
 }
 
-/**
- * Persist immutable chunks when the in-memory queue reaches its watermark.
- * A failed chunk restores only the unwritten suffix; committed chunks remain
- * valid CSV files and are included in normal backups/cleanup.
- */
-async function spillPendingCsvRows(): Promise<void> {
-  if (spillPromise) return spillPromise;
-  if (pendingRows.size === 0) return;
-
-  const batch = new Map(pendingRows);
-  pendingRows.clear();
-  const current = (async () => {
-    const entries = Array.from(batch.entries());
-    for (let entryIndex = 0; entryIndex < entries.length; entryIndex += 1) {
-      const [filePath, rows] = entries[entryIndex];
-      let offset = 0;
-      try {
-        while (offset < rows.length) {
-          const chunk = rows.slice(offset, offset + SPILL_CHUNK_ROWS);
-          const headers = Object.keys(chunk[0]);
-          const content = `${headers.join(',')}\n${chunk.map((row) => serializeRow(row, headers)).join('\n')}\n`;
-          const target = queuedCsvPath(filePath);
-          await FileSystem.writeAsStringAsync(target, content, { encoding: FileSystem.EncodingType.UTF8 });
-          const records = parseCsvRecords(await FileSystem.readAsStringAsync(target, { encoding: FileSystem.EncodingType.UTF8 }));
-          if (records.length !== chunk.length + 1 || records[0]?.join(',') !== headers.join(',')) {
-            await FileSystem.deleteAsync(target, { idempotent: true });
-            throw new Error('CSV_QUEUE_SPOOL_VALIDATION_FAILED: ' + target);
-          }
-          offset += chunk.length;
-          durablySpooledRows += chunk.length;
-        }
-      } catch (cause) {
-        const restore = rows.slice(offset);
-        for (let pendingIndex = entryIndex + 1; pendingIndex < entries.length; pendingIndex += 1) {
-          const [restorePath, restoreRows] = entries[pendingIndex];
-          const newerRows = pendingRows.get(restorePath) ?? [];
-          pendingRows.set(restorePath, [...restoreRows, ...newerRows]);
-        }
-        if (restore.length) {
-          const newerRows = pendingRows.get(filePath) ?? [];
-          pendingRows.set(filePath, [...restore, ...newerRows]);
-        }
-        throw cause;
-      }
-    }
-  })();
-  spillPromise = current;
-  let succeeded = false;
-  try {
-    await current;
-    succeeded = true;
-  } finally {
-    if (spillPromise === current) spillPromise = null;
-  }
-  if (succeeded && countPendingRows() >= MAX_PENDING_CSV_ROWS) {
-    await spillPendingCsvRows();
-  }
-}
 
 export function queueCsvRow(filePath: string, row: CsvRow): void {
   knownCsvPaths.add(filePath);
