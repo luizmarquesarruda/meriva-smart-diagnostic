@@ -155,6 +155,8 @@ async function preserveVerifiedMainAsPrevious(
 
   const backup = indexBackupPath(indexFile);
   const backupTemp = uniqueTemporaryPath(backup, 'backup-copy');
+  const backupHold = uniqueTemporaryPath(backup, 'preserved');
+  let backupHeld = false;
   try {
     await FileSystem.copyAsync({ from: indexFile, to: backupTemp });
     const copied = await inspectIndexFile(backupTemp);
@@ -163,13 +165,36 @@ async function preserveVerifiedMainAsPrevious(
       throw new Error('BACKUP_PREVIO_DO_INDICE_NAO_VALIDADO; HISTORICO_NAO_SUBSTITUIDO.');
     }
     if (previous.kind === 'VALID' || previous.kind === 'MISSING') {
-      if (previous.kind === 'VALID') await FileSystem.deleteAsync(backup, { idempotent: true });
-      await FileSystem.moveAsync({ from: backupTemp, to: backup });
-    }
-    const committedBackup = await inspectIndexFile(backup);
-    if (committedBackup.kind !== 'VALID' ||
-        committedBackup.document.cycles.length !== main.document.cycles.length) {
-      throw new Error('BACKUP_PREVIO_DO_INDICE_NAO_CONFIRMADO; HISTORICO_NAO_SUBSTITUIDO.');
+      if (previous.kind === 'VALID') {
+        await FileSystem.moveAsync({ from: backup, to: backupHold });
+        backupHeld = true;
+      }
+      try {
+        await FileSystem.moveAsync({ from: backupTemp, to: backup });
+        const committedBackup = await inspectIndexFile(backup);
+        if (committedBackup.kind !== 'VALID' ||
+            committedBackup.document.cycles.length !== main.document.cycles.length) {
+          throw new Error('BACKUP_PREVIO_DO_INDICE_NAO_CONFIRMADO; HISTORICO_NAO_SUBSTITUIDO.');
+        }
+      } catch (cause) {
+        if (backupHeld) {
+          const partial = await FileSystem.getInfoAsync(backup);
+          if (partial.exists) await FileSystem.deleteAsync(backup, { idempotent: true });
+          await FileSystem.moveAsync({ from: backupHold, to: backup });
+          backupHeld = false;
+        }
+        throw cause;
+      }
+      if (backupHeld) {
+        await FileSystem.deleteAsync(backupHold, { idempotent: true });
+        backupHeld = false;
+      }
+    } else {
+      const committedBackup = await inspectIndexFile(backup);
+      if (committedBackup.kind !== 'VALID' ||
+          committedBackup.document.cycles.length !== main.document.cycles.length) {
+        throw new Error('BACKUP_PREVIO_DO_INDICE_NAO_CONFIRMADO; HISTORICO_NAO_SUBSTITUIDO.');
+      }
     }
   } finally {
     await FileSystem.deleteAsync(backupTemp, { idempotent: true }).catch(() => undefined);
@@ -234,11 +259,17 @@ async function persistIndexSnapshot(indexFile: string, data: Omit<DriveCycleInde
     clearStorageHealthIssue('FUTURE_SCHEMA');
   } catch (cause) {
     await FileSystem.deleteAsync(tempFile, { idempotent: true }).catch(() => undefined);
-    const now = await FileSystem.getInfoAsync(indexFile);
-    if (!now.exists && main.kind === 'VALID') {
+    const now = await inspectIndexFile(indexFile);
+    if ((now.kind === 'MISSING' || now.kind === 'CORRUPT') && main.kind === 'VALID') {
       const backup = await inspectIndexFile(indexBackupPath(indexFile));
       if (backup.kind === 'VALID') {
+        if (now.kind === 'CORRUPT') await FileSystem.deleteAsync(indexFile, { idempotent: true });
         await FileSystem.copyAsync({ from: indexBackupPath(indexFile), to: indexFile });
+        const restored = await inspectIndexFile(indexFile);
+        if (restored.kind !== 'VALID') {
+          throw new Error('FALHA_AO_RESTAURAR_INDICE_ANTERIOR; ARQUIVO DE BACKUP PRESERVADO; causa=' +
+            (cause instanceof Error ? cause.message : String(cause)));
+        }
       }
     }
     throw cause;
