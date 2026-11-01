@@ -41,12 +41,20 @@ function isMaintenanceData(value: unknown): value is StoredMaintenanceData {
   if (!isRecord(value)) return false;
   if (value.schemaVersion !== undefined &&
       (!Number.isInteger(value.schemaVersion) || (value.schemaVersion as number) < 0)) return false;
-  return (value.currentOdometerKm === null ||
+  if (!(
+    (value.currentOdometerKm === null ||
       (typeof value.currentOdometerKm === 'number' && Number.isFinite(value.currentOdometerKm) && value.currentOdometerKm >= 0)) &&
     typeof value.severeUse === 'boolean' &&
     isRecord(value.records) &&
     Array.isArray(value.fuelings) &&
-    (value.updatedAt === null || typeof value.updatedAt === 'string');
+    (value.updatedAt === null ||
+      (typeof value.updatedAt === 'string' && Number.isFinite(Date.parse(value.updatedAt))))
+  )) return false;
+
+  const allowedIds = new Set(MAINTENANCE_TASKS.map((task) => task.id));
+  return Object.entries(value.records).every(([key, record]) =>
+    allowedIds.has(key as MaintenanceTaskId) && normalizeRecord(record) !== null,
+  ) && value.fuelings.every((item) => normalizeFueling(item) !== null);
 }
 
 function hasFutureMaintenanceSchema(value: unknown): boolean {
