@@ -8,6 +8,8 @@ export interface JsonRecoveryResult<T> {
 type Validator<T> = (value: unknown) => value is T;
 type FutureVersionCheck = (value: unknown) => boolean;
 
+const writeQueues = new Map<string, Promise<void>>();
+
 type Candidate<T> =
   | { kind: 'MISSING' }
   | { kind: 'INVALID' }
@@ -71,7 +73,7 @@ export async function readJsonWithRecovery<T>(
  * Substituição validada e atômica. Se o principal ou a cópia anterior existentes
  * estiverem corrompidos ou em schema futuro, a gravação é bloqueada sem alterá-los.
  */
-export async function writeJsonAtomically<T>(
+async function writeJsonAtomicallyUnsafe<T>(
   path: string,
   value: T,
   validate: Validator<T>,
@@ -116,9 +118,10 @@ export async function writeJsonAtomically<T>(
     if (committed.kind !== 'VALID') throw new Error('JSON_COMMITTED_READBACK_FAILED: ' + path);
   } catch (cause) {
     const currentMain = await readCandidate(path, validate, isFutureVersion);
-    if (currentMain.kind === 'MISSING') {
+    if (currentMain.kind === 'MISSING' || currentMain.kind === 'INVALID') {
       const recovery = await readCandidate(backup, validate, isFutureVersion);
       if (recovery.kind === 'VALID') {
+        if (currentMain.kind === 'INVALID') await FileSystem.deleteAsync(path, { idempotent: true });
         await FileSystem.copyAsync({ from: backup, to: path });
         const restored = await readCandidate(path, validate, isFutureVersion);
         if (restored.kind !== 'VALID') {
@@ -132,4 +135,21 @@ export async function writeJsonAtomically<T>(
     await FileSystem.deleteAsync(temp, { idempotent: true }).catch(() => undefined);
     await FileSystem.deleteAsync(backupTemp, { idempotent: true }).catch(() => undefined);
   }
+}
+
+/** Serializa gravações do mesmo arquivo para evitar snapshots concorrentes. */
+export function writeJsonAtomically<T>(
+  path: string,
+  value: T,
+  validate: Validator<T>,
+  isFutureVersion: FutureVersionCheck = () => false,
+): Promise<void> {
+  const previous = writeQueues.get(path) ?? Promise.resolve();
+  const current = previous
+    .catch(() => undefined)
+    .then(() => writeJsonAtomicallyUnsafe(path, value, validate, isFutureVersion));
+  writeQueues.set(path, current);
+  return current.finally(() => {
+    if (writeQueues.get(path) === current) writeQueues.delete(path);
+  });
 }
