@@ -5114,3 +5114,10 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - PRs originadas em forks continuam sem upload de artefato; o build e a validação permanecem executados normalmente.
 - Retenção de 14 dias; sem GitHub Release automática e sem permissão `contents: write`.
 - A CI precisa executar novamente no novo SHA e confirmar o artefato na lista da execução. O APK anterior não foi guardado como artefato e não pode ser recuperado dessa execução.
+## DB-203 · 2026-11-01 — Corrigir compilação do logger CSV e isolamento dos testes de limpeza
+
+- Removido um fragmento duplicado/truncado em `src/database/csvLogger.ts`, restaurando o fechamento do matcher dos segmentos CSV diários sem alterar a política de rotação ou a serialização.
+- Corrigido o estreitamento de tipo em `src/storage/cleanup.ts`: `modificationTime` só é acessado quando `getInfoAsync` confirma que o arquivo existe.
+- O teste de robustez da limpeza agora isola as dependências do logger CSV e da política de retenção; a política real continua coberta por sua suíte própria.
+- A execução CI do SHA `f05e03009ee4c66bf03f58c1dbcc56e18955fa09` passou por `expo-doctor` e `gate:baseline`; `npm run validate` ainda está em execução.
+- Nenhum merge foi realizado. A compilação e o ensaio físico no Galaxy A06/ELM327 permanecem pendentes.
