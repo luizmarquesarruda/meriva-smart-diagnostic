@@ -189,6 +189,39 @@ async function main() {
   }
   assert.ok(files.get(rotatedSegments[1]).includes('after-limit'));
 
+  // Pre-upgrade .queue-* files remain visible and participate in ID deduplication.
+  const legacyQueuePath = '/base/LOGS/obd_raw_2026-11-01.queue-1793520000000-000001.csv';
+  files.set(legacyQueuePath,
+    'timestamp,eventId,pid,extra\\n2026-11-01T10:00:00.008Z,event-legacy,010C,legacy-column\\n');
+  const withLegacyQueue = await restartedLogger.getCsvLogSegments(filePath);
+  assert.ok(withLegacyQueue.includes(legacyQueuePath),
+    'legacy overflow files must remain readable after upgrading');
+  assert.ok(restartedLogger.getActiveCsvLogPaths(new Date('2026-11-01T12:00:00'))
+    .includes(legacyQueuePath), 'legacy queue paths for the current day must remain active');
+  await restartedLogger.appendCsvRowIfMissing(
+    filePath,
+    { timestamp: '2026-11-01T10:00:00.009Z', eventId: 'event-legacy', pid: '010C' },
+    'eventId',
+  );
+  assert.equal(parseCsv(files.get(legacyQueuePath)).filter((record) => record[1] === 'event-legacy').length, 1,
+    'idempotent append must scan legacy queue segments before creating a duplicate');
+
+  // An unreadable directory must never be reported as an empty history.
+  unreadableDirectories.add('/base/LOGS');
+  await assert.rejects(restartedLogger.getCsvLogSegments(filePath), /DIRECTORY_READ_FAILED/);
+  await assert.rejects(
+    restartedLogger.appendCsvRowIfMissing(
+      filePath,
+      { timestamp: '2026-11-01T10:00:00.010Z', eventId: 'event-after-read-failure', pid: '010C' },
+      'eventId',
+    ),
+    /DIRECTORY_READ_FAILED/,
+    'idempotent append must fail closed when it cannot inspect all prior segments',
+  );
+  unreadableDirectories.delete('/base/LOGS');
+  assert.ok((await restartedLogger.getCsvLogSegments(filePath)).includes(legacyQueuePath),
+    'failed scans must not delete or hide legacy persisted files');
+
   console.log('csvSpoolDurability.test.js: PASS');
 }
 
