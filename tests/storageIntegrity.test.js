@@ -422,6 +422,10 @@ async function main() {
     'a restauração legada deve recuperar as pastas que estavam presentes no manifesto');
   assert.equal(files.get(backupBase + '/LEITURAS/historico.csv'), 'CSV legado preservado');
   assert.equal(files.get(backupBase + '/LOGS/historico.csv'), 'CSV legado preservado');
+  const restoreSafety = (await backup.listVerifiedBackups(backupBase))
+    .find((item) => item.name === legacyRestore.safetyBackupName);
+  assert.ok(restoreSafety?.includes.includes('LEITURAS') && restoreSafety.includes.includes('LOGS'),
+    'o snapshot de rollback deve preservar também as pastas brutas substituídas por um backup legado');
 
   Module._load = originalLoad;
   console.log('storageIntegrity.test.js: PASS');
