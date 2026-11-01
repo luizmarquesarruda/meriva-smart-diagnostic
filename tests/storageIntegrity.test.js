@@ -127,12 +127,22 @@ const fakeFileSystem = {
 const platform = { Platform: { OS: 'android', Version: 36 } };
 let migrationExports = null;
 let healthExports = null;
+let atomicExports = null;
 const originalLoad = Module._load;
 Module._load = function(request) {
   if (request === 'expo-file-system') return fakeFileSystem;
   if (request === 'react-native') return platform;
   if (request === './historyIndexMigrations') return migrationExports;
-  if (request === './storageHealth') return healthExports;
+  if (request === './storageHealth' || request === '../storage/storageHealth') return healthExports;
+  if (request === '../storage/atomicJsonFile') return atomicExports;
+  if (request === './merivaManual') return { MERIVA_MANUAL: {
+    modelYear: 2012,
+    engine: { designation: '1.4 8V ECONO.FLEX', displacementCm3: 1389, cylinders: 4 },
+    modelYearReference: '2011/2012',
+    capacities: { fuelTankL: 54, fuelReserveApproxL: 5 },
+    source: 'MANUAL_CHEVROLET_MERIVA',
+  } };
+  if (request === '../maintenance/maintenanceRules') return { MAINTENANCE_TASKS: [{ id: 'OIL' }] };
   if (request === '../database/csvLogger') {
     return { appendCsvRow: async (filePath, row) => csvRows.push({ filePath, row }), flushCsvLogs: async () => undefined };
   }
@@ -157,6 +167,7 @@ function loadTs(relativePath) {
 }
 
 const atomicJson = loadTs('src/storage/atomicJsonFile.ts');
+atomicExports = atomicJson;
 const migrations = loadTs('src/storage/historyIndexMigrations.ts');
 migrationExports = migrations;
 const health = loadTs('src/storage/storageHealth.ts');
@@ -164,6 +175,10 @@ healthExports = health;
 const history = loadTs('src/storage/driveCycleStorage.ts');
 const benchmark = loadTs('src/storage/historyBenchmark.ts');
 const backup = loadTs('src/storage/backup.ts');
+const appSettings = loadTs('src/database/appSettings.ts');
+const vehicleConfig = loadTs('src/database/vehicleConfig.ts');
+const learningProfile = loadTs('src/database/learningProfile.ts');
+const maintenanceStorage = loadTs('src/database/maintenanceStorage.ts');
 
 function makeTrip(id) {
   return {
@@ -244,6 +259,79 @@ async function main() {
   );
   assert.deepEqual(JSON.parse(files.get(rollbackJsonPath)), rollbackOriginal,
     'falha ao substituir deve restaurar a cópia anterior verificada');
+
+  const settingsBase = '/doc/SETTINGS_TEST';
+  const settingsPath = settingsBase + '/CONFIG/app-settings.json';
+  ensureDirectory(settingsBase + '/CONFIG');
+  const brokenSettings = '{CONFIGURAÇÕES CORROMPIDAS';
+  files.set(settingsPath, brokenSettings);
+  files.set(settingsBase + '/CONFIG/app-settings.previous.json', JSON.stringify({
+    schemaVersion: 1, fuelType: 'ETANOL', distanceUnit: 'KM', autoConnectObd: true,
+  }));
+  const restoredSettings = await appSettings.readAppSettings(settingsBase);
+  assert.equal(restoredSettings.fuelType, 'ETANOL');
+  assert.equal(files.get(settingsPath), brokenSettings, 'settings usa cópia anterior apenas para leitura');
+  await assert.rejects(
+    () => appSettings.writeAppSettings(settingsBase, restoredSettings),
+    /JSON_CORRUPTED/,
+  );
+  assert.equal(files.get(settingsPath), brokenSettings, 'write de settings não pode substituir JSON corrompido');
+
+  const futureSettingsBase = '/doc/FUTURE_SETTINGS_TEST';
+  const futureSettingsPath = futureSettingsBase + '/CONFIG/app-settings.json';
+  ensureDirectory(futureSettingsBase + '/CONFIG');
+  const futureSettings = JSON.stringify({ schemaVersion: 2, fuelType: 'GASOLINA' });
+  files.set(futureSettingsPath, futureSettings);
+  await appSettings.readAppSettings(futureSettingsBase);
+  assert.equal(files.get(futureSettingsPath), futureSettings, 'settings não pode sobrescrever schema futuro');
+
+  const vehicleBase = '/doc/VEHICLE_TEST';
+  const vehiclePath = vehicleBase + '/CONFIG/veiculo.json';
+  ensureDirectory(vehicleBase + '/CONFIG');
+  const brokenVehicle = '{VEICULO CORROMPIDO';
+  const previousVehicle = {
+    schemaVersion: 1, vehicleName: 'Meriva Maxx', year: 2012, make: 'Chevrolet',
+    model: 'Meriva Maxx', engine: '1.4 8V ECONO.FLEX', displacementCm3: 1389,
+    cylinders: 4, fuel: 'Gasolina / Álcool', modelYearReference: '2011/2012',
+    tankCapacityL: 54, reserveCapacityL: 5, manualSource: 'MANUAL_CHEVROLET_MERIVA',
+    createdAt: '2026-10-31T10:00:00.000Z', lastModified: '2026-10-31T10:00:00.000Z',
+    protocolBaseline: 'KWP/K-Line',
+  };
+  files.set(vehiclePath, brokenVehicle);
+  files.set(vehicleBase + '/CONFIG/veiculo.previous.json', JSON.stringify(previousVehicle));
+  const safeVehicle = await vehicleConfig.ensureMerivaVehicleProfile(vehicleBase);
+  assert.equal(safeVehicle.vehicleName, 'Meriva Maxx');
+  assert.equal(files.get(vehiclePath), brokenVehicle, 'perfil recuperado não pode provocar regravação do arquivo corrompido');
+
+  const learningBase = '/doc/LEARNING_TEST';
+  const learningPath = learningBase + '/APRENDIZADO/dna_meriva.json';
+  ensureDirectory(learningBase + '/APRENDIZADO');
+  const brokenLearning = '{DNA CORROMPIDO';
+  files.set(learningPath, brokenLearning);
+  assert.equal(await learningProfile.readLearningProfile(learningBase), null);
+  const ephemeralLearning = await learningProfile.createLearningProfile(learningBase, '2026-10-31T10:00:00.000Z');
+  assert.equal(ephemeralLearning.learningStatus, 'COLD_START');
+  assert.equal(files.get(learningPath), brokenLearning, 'perfil de aprendizado corrompido deve permanecer intacto');
+
+  const maintenanceBase = '/doc/MAINTENANCE_TEST';
+  const maintenancePath = maintenanceBase + '/MANUTENCAO/registros.json';
+  ensureDirectory(maintenanceBase + '/MANUTENCAO');
+  const brokenMaintenance = '{MANUTENÇÃO CORROMPIDA';
+  files.set(maintenancePath, brokenMaintenance);
+  const maintenancePrevious = {
+    schemaVersion: 1, currentOdometerKm: 123456, severeUse: false,
+    records: {}, fuelings: [], updatedAt: '2026-10-31T10:00:00.000Z',
+  };
+  files.set(maintenanceBase + '/MANUTENCAO/registros.previous.json', JSON.stringify(maintenancePrevious));
+  const restoredMaintenance = await maintenanceStorage.readMaintenanceData(maintenanceBase);
+  assert.equal(restoredMaintenance.currentOdometerKm, 123456);
+  assert.equal(files.get(maintenancePath), brokenMaintenance,
+    'manutenção deve usar cópia anterior somente para leitura');
+
+  const freshSettings = await appSettings.readAppSettings('/doc/FRESH_SETTINGS_TEST');
+  assert.equal(freshSettings.fuelType, 'FLEX');
+  assert.equal(JSON.parse(files.get('/doc/FRESH_SETTINGS_TEST/CONFIG/app-settings.json')).schemaVersion, 1,
+    'instalação sem arquivo deve criar configurações versionadas');
 
   const base = '/doc/MERIVA_SMART';
   const tripsDirectory = base + '/VIAGENS';
