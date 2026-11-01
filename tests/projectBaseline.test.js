@@ -183,10 +183,14 @@ assert.match(read('src/database/csvLogger.ts'), /MAX_PENDING_CSV_ROWS/);
 assert.match(read('src/database/csvLogger.ts'), /writeCsvSpoolSegmentUnsafe/);
 assert.match(read('src/database/csvLogger.ts'), /getCsvLogSegments/);
 assert.match(read('src/database/csvLogger.ts'), /buildCsvSpoolChunks/);
-assert.match(read('src/database/csvLogger.ts'), /name\\.startsWith\\(stem \\+ '\\.queue-'\\)/,
+const csvLoggerSource = read('src/database/csvLogger.ts');
+assert.ok(csvLoggerSource.includes("name.startsWith(stem + '.queue-')"),
   'pre-upgrade CSV queue files must remain readable for recovery');
-assert.doesNotMatch(read('src/database/csvLogger.ts'), /queuedCsvPath|\\.queue-\\$\\{/,
-  'new durable overflow writes must use canonical CSV segments, not legacy queue files');
+assert.equal(csvLoggerSource.includes('queuedCsvPath'), false,
+  'new durable overflow writes must not recreate legacy queue files');
+assert.equal(csvLoggerSource.includes('.queue-${'), false,
+  'new durable overflow paths must use canonical CSV segments');
+
 assert.match(read('app/armazenamento.tsx'), /csvQueueStatus\.droppedRows/);
 assert.match(read('app/armazenamento.tsx'), /csvQueueStatus\.pendingRows/);
 assert.match(read('src/database/csvLogger.ts'), /parseCsvRecords/);
