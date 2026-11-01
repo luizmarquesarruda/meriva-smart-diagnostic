@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import { isExpiredCleanupFile } from './cleanupPolicy';
+import { flushCsvLogs, getActiveCsvLogPaths } from '../database/csvLogger';
 
 export interface CleanupResult {
   removed: number;
@@ -8,6 +9,8 @@ export interface CleanupResult {
 
 async function cleanupDirectory(basePath: string, directory: 'LOGS' | 'LEITURAS'): Promise<CleanupResult> {
   const directoryPath = `${basePath}/${directory}`;
+  await flushCsvLogs();
+  const protectedPaths = new Set(getActiveCsvLogPaths());
   const result: CleanupResult = { removed: 0, failed: 0 };
   let files: string[];
   try {
@@ -23,6 +26,7 @@ async function cleanupDirectory(basePath: string, directory: 'LOGS' | 'LEITURAS'
   for (const file of files) {
     const filePath = `${directoryPath}/${file}`;
     try {
+      if (protectedPaths.has(filePath)) continue;
       const fileInfo = await FileSystem.getInfoAsync(filePath);
       if (typeof fileInfo.modificationTime === 'number'
           && isExpiredCleanupFile(directory, fileInfo.modificationTime * 1000, now)) {

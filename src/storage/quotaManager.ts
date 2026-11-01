@@ -1,5 +1,5 @@
 import * as FileSystem from 'expo-file-system';
-import { flushCsvLogs } from '../database/csvLogger';
+import { flushCsvLogs, getActiveCsvLogPaths } from '../database/csvLogger';
 import { CLEANUP_DIRECTORIES, sortCleanupCandidates } from './cleanupPolicy';
 
 export interface StorageQuotaConfig {
@@ -29,7 +29,7 @@ async function getEntrySizeBytes(path: string): Promise<number> {
 
 interface DeletableStorageFile { path: string; size: number; modifiedAt: number; }
 
-async function collectDeletableFiles(path: string, output: DeletableStorageFile[]): Promise<number> {
+async function collectDeletableFiles(path: string, output: DeletableStorageFile[], protectedPathsForCollection: Set<string>): Promise<number> {
   let failed = 0;
   let info;
   try {
@@ -39,6 +39,7 @@ async function collectDeletableFiles(path: string, output: DeletableStorageFile[
   }
   if (!info.exists) return 0;
   if (!info.isDirectory) {
+    if (protectedPathsForCollection.has(path)) return 0;
     if (typeof info.size !== 'number' || !Number.isFinite(info.size) || info.size < 0) {
       return 1;
     }
@@ -57,7 +58,7 @@ async function collectDeletableFiles(path: string, output: DeletableStorageFile[
   } catch {
     return 1;
   }
-  for (const child of children) failed += await collectDeletableFiles(`${path}/${child}`, output);
+  for (const child of children) failed += await collectDeletableFiles(`${path}/${child}`, output, protectedPathsForCollection);
   return failed;
 }
 
@@ -71,9 +72,10 @@ async function cleanupToTarget(basePath: string, targetBytes: number): Promise<{
   if (usedBytes <= targetBytes) return { removed: 0, failed: 0, usedBytes };
 
   const candidates: DeletableStorageFile[] = [];
+  const protectedPaths = new Set(getActiveCsvLogPaths());
   let failed = 0;
   for (const directory of CLEANUP_DIRECTORIES) {
-    failed += await collectDeletableFiles(`${basePath}/${directory}`, candidates);
+    failed += await collectDeletableFiles(`${basePath}/${directory}`, candidates, protectedPaths);
   }
   const orderedCandidates = sortCleanupCandidates(candidates);
   let removed = 0;

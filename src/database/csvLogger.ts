@@ -20,6 +20,8 @@ export interface CsvRow {
 }
 
 const fileQueues = new Map<string, Promise<void>>();
+const knownCsvPaths = new Set<string>();
+const writingCsvPaths = new Set<string>();
 const pendingRows = new Map<string, CsvRow[]>();
 const BATCH_FLUSH_INTERVAL_MS = 1000;
 export const MAX_CSV_SEGMENT_BYTES = 512 * 1024;
@@ -117,6 +119,141 @@ export function getCsvQueueStatus(): {
   };
 }
 
+/** Caminhos CSV do dia local atual e arquivos que estão em escrita. */
+export function getActiveCsvLogPaths(now = new Date()): string[] {
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const date = `${year}-${month}-${day}`;
+  const currentDayPattern = new RegExp(`obd_(?:raw|interpreted)_${date}(?:\\.part-\\d{4})?\\.csvimport * as FileSystem from 'expo-file-system';
+import { AppState } from 'react-native';
+import { BATCH_FLUSH_ROW_LIMIT, HARD_MAX_PENDING_CSV_ROWS, MAX_PENDING_CSV_ROWS, SPILL_CHUNK_ROWS, getCsvQueueAction } from './csvQueuePolicy';
+
+export type CsvValue = string | number | boolean | null | undefined;
+
+export interface CsvRow {
+  [key: string]: CsvValue;
+  timestamp?: string;
+  pid?: string;
+  nome?: string;
+  valor?: string | number | null;
+  unidade?: string;
+  rpm?: number | string | null;
+  temperatura?: number | string | null;
+  velocidade?: number | string | null;
+  condicao?: string;
+  maxSpeed?: number | string | null;
+  telemetrySamples?: number | string | null;
+}
+
+const fileQueues = new Map<string, Promise<void>>();
+const knownCsvPaths = new Set<string>();
+const writingCsvPaths = new Set<string>();
+const pendingRows = new Map<string, CsvRow[]>();
+const BATCH_FLUSH_INTERVAL_MS = 1000;
+export const MAX_CSV_SEGMENT_BYTES = 512 * 1024;
+let droppedPendingRows = 0;
+let durablySpooledRows = 0;
+let peakObservedPendingRows = 0;
+let totalFlushes = 0;
+let lastFlushDurationMs = 0;
+let maxFlushDurationMs = 0;
+let flushFailures = 0;
+let spillSequence = 0;
+let spillPromise: Promise<void> | null = null;
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let flushPromise: Promise<void> | null = null;
+
+function formatCsvValue(value: CsvValue): string {
+  if (value === null || value === undefined) return '';
+  const asString = String(value);
+  return asString.includes(',') || asString.includes('"') || asString.includes('\n')
+    ? `"${asString.replace(/"/g, '""')}"`
+    : asString;
+}
+
+function serializeRow(row: CsvRow, headers: string[] = Object.keys(row)): string {
+  return headers.map((key) => formatCsvValue(row[key])).join(',');
+}
+
+function parseCsvRecords(content: string): string[][] {
+  const records: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+  for (let index = 0; index < content.length; index += 1) {
+    const character = content[index];
+    if (inQuotes) {
+      if (character === '"' && content[index + 1] === '"') {
+        field += '"';
+        index += 1;
+      } else if (character === '"') {
+        inQuotes = false;
+      } else {
+        field += character;
+      }
+      continue;
+    }
+    if (character === '"' && field.length === 0) {
+      inQuotes = true;
+    } else if (character === ',') {
+      row.push(field);
+      field = '';
+    } else if (character === '\n') {
+      row.push(field.replace(/\r$/, ''));
+      if (row.some((value) => value.length > 0)) records.push(row);
+      row = [];
+      field = '';
+    } else {
+      field += character;
+    }
+  }
+  if (inQuotes) throw new Error('CSV_PARSE_FAILED: aspas não fechadas no arquivo existente');
+  if (field.length > 0 || row.length > 0) {
+    row.push(field.replace(/\r$/, ''));
+    if (row.some((value) => value.length > 0)) records.push(row);
+  }
+  return records;
+}
+
+function countPendingRows(): number {
+  let total = 0;
+  for (const rows of pendingRows.values()) total += rows.length;
+  return total;
+}
+
+export function getCsvQueueStatus(): {
+  pendingRows: number;
+  droppedRows: number;
+  maxPendingRows: number;
+  durablySpooledRows: number;
+  peakObservedPendingRows: number;
+  totalFlushes: number;
+  lastFlushDurationMs: number;
+  maxFlushDurationMs: number;
+  flushFailures: number;
+} {
+  return {
+    pendingRows: countPendingRows(),
+    droppedRows: droppedPendingRows,
+    maxPendingRows: MAX_PENDING_CSV_ROWS,
+    durablySpooledRows,
+    peakObservedPendingRows,
+    totalFlushes,
+    lastFlushDurationMs,
+    maxFlushDurationMs,
+    flushFailures,
+  };
+}
+
+);
+  const paths = new Set<string>(writingCsvPaths);
+  for (const filePath of knownCsvPaths) {
+    if (currentDayPattern.test(filePath)) paths.add(filePath);
+  }
+  return Array.from(paths);
+}
+
 function* pendingRowsMapValues(): IterableIterator<CsvRow[]> {
   yield* pendingRows.values();
 }
@@ -181,7 +318,11 @@ async function writeRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<void> 
   const directory = filePath.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/')) : '.';
   await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
   const targetPath = await resolveWritableSegment(filePath);
+  knownCsvPaths.add(filePath);
+  knownCsvPaths.add(targetPath);
+  writingCsvPaths.add(targetPath);
 
+  try {
   const info = await FileSystem.getInfoAsync(targetPath, { size: true });
   if (!info.exists) {
     const headers = Object.keys(rows[0]);
@@ -246,6 +387,9 @@ async function writeRowsUnsafe(filePath: string, rows: CsvRow[]): Promise<void> 
   await FileSystem.writeAsStringAsync(targetPath, `${current}${separator}${lines.join('\n')}\n`, {
     encoding: FileSystem.EncodingType.UTF8,
   });
+  } finally {
+    writingCsvPaths.delete(targetPath);
+  }
 }
 function scheduleBatchFlush(): void {
   if (flushTimer) return;
@@ -324,6 +468,7 @@ async function spillPendingCsvRows(): Promise<void> {
 }
 
 export function queueCsvRow(filePath: string, row: CsvRow): void {
+  knownCsvPaths.add(filePath);
   const totalBefore = countPendingRows();
   if (getCsvQueueAction(totalBefore) === 'drop') {
     droppedPendingRows += 1;
@@ -428,6 +573,7 @@ export async function flushCsvLogs(): Promise<void> {
 
 /** Compatibility path for non-live records, including finalized drive cycles. */
 export async function appendCsvRow(filePath: string, row: CsvRow): Promise<void> {
+  knownCsvPaths.add(filePath);
   await enqueueFileOperation(filePath, () => writeRowsUnsafe(filePath, [row]));
 }
 
