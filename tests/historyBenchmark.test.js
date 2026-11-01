@@ -46,6 +46,12 @@ assert.match(source, /HISTORY_MEASUREMENT_DIRECTORY_UNAVAILABLE/, 'directory enu
 assert.match(source, /readDirectoryAsync\(directory\)/, 'directory listing must be strict instead of swallowing I/O errors');
 assert.doesNotMatch(source, /readDirectoryAsync\(directory\)\.catch\(\(\) => \[\]\)/);
 assert.match(source, /scratchSequence/, 'benchmark scratch names must avoid overwriting a previous measurement file');
+assert.match(source, /utf8ByteLength\(raw\)/, 'JSON size must be measured in UTF-8 bytes from the exact snapshot');
+assert.match(source, /HISTORICO_MUDOU_DURANTE_LEITURA_INICIAL/, 'the initial file size must match the bytes read');
+assert.match(source, /HISTORY_BENCHMARK_SCRATCH_NOT_REMOVED/, 'scratch cleanup failure must be visible');
+assert.doesNotMatch(source, /deleteAsync\(scratchPath, \{ idempotent: true \}\)\.catch\(\(\) => undefined\)/,
+  'benchmark must not silently leave measurement files behind');
+
 
 assert.doesNotMatch(source, /writeAsStringAsync\(indexPath/);
 assert.match(source, /uniqueTripIds/);
