@@ -318,6 +318,7 @@
 - **DB-200** · 2026-10-31 — Sincronizar teste de retry Bluetooth com o ponto real de implementação
 - **DB-201** · 2026-10-31 — Cobrir fallback não destrutivo e proteção de schema futuro nos testes JSON
 - **DB-202** · 2026-10-31 — Publicar artefato APK nas PRs do próprio repositório
+- **DB-203** · 2026-11-01 — Corrigir compilação do logger CSV e isolamento dos testes de limpeza
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
