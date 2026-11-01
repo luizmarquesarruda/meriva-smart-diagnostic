@@ -41,6 +41,7 @@ assert.match(source, /deleteAsync\(scratchPath/);
 assert.match(source, /readAsStringAsync\(indexPath/);
 assert.match(source, /migrateHistoryIndexDocument\(parsed\)/, 'benchmark must reject unsupported/future history schema');
 assert.match(source, /readDriveCycles\(basePath\)/, 'benchmark must validate main history using the canonical reader');
+assert.match(source, /cycles\.every\(\(cycle\) => isDriveCycle\(cycle\)\)/, 'benchmark must validate each trip record before counting it');
 assert.match(source, /current !== raw/, 'benchmark must cancel if history contents change during measurement');
 assert.match(source, /HISTORY_MEASUREMENT_DIRECTORY_UNAVAILABLE/, 'directory enumeration failures must not be reported as zero bytes');
 assert.match(source, /readDirectoryAsync\(directory\)/, 'directory listing must be strict instead of swallowing I/O errors');
