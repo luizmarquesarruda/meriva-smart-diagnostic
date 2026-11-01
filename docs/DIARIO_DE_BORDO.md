@@ -285,6 +285,7 @@
 - **DB-192** · 2026-10-31 — Integrar layout e relatórios, consolidar P0 e registrar validação dos SHAs finais
 - **DB-193** · 2026-10-31 — Velocidade derivada GPS e recuperação atômica do histórico ECU
 - **DB-194** · 2026-10-31 — Auditoria estática do layout no Galaxy A06 / Android 16
+- **DB-195** · 2026-11-01 — Integridade JSON, backup seletivo e benchmark local do histórico
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -4993,4 +4994,30 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - app.json não fixa targetSdkVersion/compileSdkVersion e a pasta android é gerada pelo prebuild. O target efetivo deve ser lido do APK final; a referência-base do Expo SDK 51/RN 0.74 não substitui a inspeção do manifesto do artefato. Edge-to-edge Android 15/16 depende do target efetivo.
 - Relatório detalhado: docs/AUDITORIA_LAYOUT_GALAXY_A06_ANDROID_16_2026-10-31.md.
 - Limite: auditoria estática de código/documentação. Nenhuma captura, instalação ou inspeção física do Galaxy A06 foi realizada nesta rodada. O teste visual no aparelho continua pendente.
+
+## DB-195 · 2026-11-01 — Integridade JSON, backup seletivo e benchmark local do histórico
+
+### Alterações desta fase
+- Criada a branch `improve/phase1-storage-integrity-20261101` diretamente de `main`; nenhuma alteração foi mesclada.
+- Backups rotineiros passam a excluir `LEITURAS` e `LOGS`, evitando duplicar CSVs brutos. A validação de manifestos continua aceitando essas pastas em snapshots antigos.
+- A cópia de segurança criada durante uma restauração passa a incluir todos os diretórios que o snapshot selecionado irá substituir, inclusive `LEITURAS` e `LOGS` quando presentes em backup legado. Isso preserva o rollback sem reintroduzir os CSVs brutos nos backups rotineiros.
+- O índice `VIAGENS/index.json` passou a usar schema versionado. Migração só é permitida para documentos legados íntegros; schema futuro e JSON principal corrompido bloqueiam gravação. Uma cópia anterior validada pode alimentar somente leitura, sem reparo automático do arquivo original.
+- Adicionado utilitário comum de JSON com leitura de recuperação somente de cópia anterior validada, gravação temporária com leitura de retorno, serialização por caminho, cópia anterior e restauração quando a substituição falha. Configurações, perfil do veículo, aprendizado e manutenção utilizam esse fluxo.
+- Quando o perfil de veículo ou aprendizado está corrompido/mais novo, o aplicativo pode manter um objeto de uso em memória para não bloquear o início do OBD; o arquivo persistido permanece intacto e a gravação é recusada.
+- Avisos de armazenamento foram centralizados na Central de Saúde. A tela Armazenamento mostra o uso de BACKUP em separado e mantém os controles de quota/exportação; o contador de linhas CSV descartadas deixou de ser duplicado nessa tela.
+- Adicionado `historyBenchmark.ts`: sete rodadas de leitura/parse, gravação temporária, verificação de cópia de restauração e medição de volumes. O relatório TXT pode ser exportado pelo seletor de diretório Android.
+- Critérios propostos para investigar SQLite: leitura/parse p95 acima de 250 ms, escrita/read-back p95 acima de 500 ms, cópia de restauração p95 acima de 500 ms, abertura da tela Viagens p95 acima de 1 s, aumento de memória acima de 20 MB e ganho de latência p95 de pelo menos 30% em comparação direta. São limiares de decisão, não medições do aparelho.
+- Criada a suíte `tests/storageIntegrity.test.js`, incluindo schema futuro, JSON corrompido, leitura pela cópia anterior sem sobrescrita, migração de legado, falha de substituição/rollback, backup seletivo, compatibilidade/restauração de backup antigo e benchmark sem gravação no índice principal. A suíte foi adicionada ao `npm test` e ao gate de baseline.
+
+### Proteções preservadas e limites
+- O histórico TXT diário ECU não foi alterado, truncado nem limitado. A lógica existente de múltiplas sessões no mesmo dia, fila concorrente, snapshot temporário, leitura de retorno e recuperação permanece intacta.
+- GPS, polling, transporte Bluetooth, DTCs e comandos OBD não foram alterados nesta fase.
+- SQLite não foi introduzido.
+- Validação local de `npx tsc --noEmit`, suíte completa e `gate:baseline`: ainda não executada neste ambiente; a validação da CI deverá ser verificada no SHA final da PR.
+- Benchmark no Galaxy A06/SM-A065M/Android 16: não executado. Memória do processo e tempo de abertura da tela exigem medição externa no aparelho.
+- Ensaio físico com ELM327/ECU: não validado. Nenhum resultado de CI ou hardware é presumido.
+
+### Próximos passos
+- Revisar o diff final da PR, executar CI no SHA exato e corrigir qualquer falha sem enfraquecer o baseline.
+- Executar o benchmark TXT no Galaxy A06 e guardar o resultado antes de decidir qualquer migração SQLite.
 
