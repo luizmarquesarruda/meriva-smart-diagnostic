@@ -1,6 +1,8 @@
 import * as FileSystem from 'expo-file-system';
 import { appendCsvRow, CsvRow } from '../database/csvLogger';
 import { DriveCycle } from '../data/driveCycles';
+import { CURRENT_HISTORY_SCHEMA_VERSION, migrateHistoryIndexDocument } from './historyIndexMigrations';
+import { recordStorageHealthIssue, clearStorageHealthIssue } from './storageHealth';
 
 const indexWriteQueues = new Map<string, Promise<unknown>>();
 
@@ -20,7 +22,9 @@ function localDateKey(date: Date): string {
 }
 
 function indexBackupPath(indexFile: string): string { return indexFile.replace(/\.json$/, '.previous.json'); }
-function indexTempPath(indexFile: string): string { return indexFile.replace(/\.json$/, '.tmp'); }
+function uniqueTemporaryPath(indexFile: string, suffix: string): string {
+  return indexFile + '.' + suffix + '-' + Date.now() + '-' + Math.random().toString(16).slice(2) + '.tmp';
+}
 
 function isDriveCycle(value: unknown): value is DriveCycle {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
@@ -55,13 +59,13 @@ function isDriveCycle(value: unknown): value is DriveCycle {
   );
 }
 
-function cyclesFromUnknown(value: unknown): DriveCycle[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(isDriveCycle);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 type DriveCycleIndex = {
   version: string;
+  schemaVersion: number;
   cycles: DriveCycle[];
   totalCount: number;
   initializedAt?: string;
@@ -69,29 +73,177 @@ type DriveCycleIndex = {
   [key: string]: unknown;
 };
 
-async function persistIndexSnapshot(indexFile: string, data: DriveCycleIndex): Promise<void> {
-  const tempFile = indexTempPath(indexFile);
-  await FileSystem.writeAsStringAsync(tempFile, JSON.stringify(data, null, 2), {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+type IndexInspection =
+  | { kind: 'MISSING' }
+  | { kind: 'CORRUPT'; reason: string }
+  | { kind: 'FUTURE'; version: number }
+  | { kind: 'VALID'; document: DriveCycleIndex; migrated: boolean };
+
+function validateIndexCycles(value: unknown): DriveCycle[] | null {
+  if (!Array.isArray(value)) return null;
+  const onlySeeds = value.every((item) =>
+    isRecord(item) && item.source === 'CARSCANNER_SEED',
+  );
+  const invalidNonSeeds = value.some((item) =>
+    !(isRecord(item) && item.source === 'CARSCANNER_SEED') && !isDriveCycle(item),
+  );
+  const valid = value.filter(isDriveCycle);
+  if (invalidNonSeeds || (value.length > 0 && valid.length === 0 && !onlySeeds)) return null;
+  return valid;
+}
+
+async function inspectIndexFile(filePath: string): Promise<IndexInspection> {
+  const info = await FileSystem.getInfoAsync(filePath);
+  if (!info.exists) return { kind: 'MISSING' };
+  if (info.isDirectory) return { kind: 'CORRUPT', reason: 'O caminho do índice aponta para um diretório.' };
+
+  let parsed: unknown;
   try {
-    const verified = JSON.parse(await FileSystem.readAsStringAsync(tempFile)) as { cycles?: unknown };
-    if (!Array.isArray(verified.cycles) || verified.cycles.length !== data.cycles.length ||
-        !verified.cycles.every(isDriveCycle)) {
-      throw new Error('VALIDACAO_DO_INDICE_TEMPORARIO_FALHOU');
-    }
-  } catch (cause) {
-    await FileSystem.deleteAsync(tempFile, { idempotent: true });
-    throw cause;
+    parsed = JSON.parse(await FileSystem.readAsStringAsync(filePath, {
+      encoding: FileSystem.EncodingType.UTF8,
+    }));
+  } catch {
+    return { kind: 'CORRUPT', reason: 'O JSON do índice não pôde ser interpretado.' };
+  }
+  if (!isRecord(parsed)) return { kind: 'CORRUPT', reason: 'O documento JSON do índice não é um objeto.' };
+
+  if (typeof parsed.schemaVersion === 'number' &&
+      Number.isInteger(parsed.schemaVersion) &&
+      parsed.schemaVersion > CURRENT_HISTORY_SCHEMA_VERSION) {
+    return { kind: 'FUTURE', version: parsed.schemaVersion };
   }
 
   try {
-    const main = await FileSystem.getInfoAsync(indexFile);
-    if (main.exists) await FileSystem.deleteAsync(indexFile, { idempotent: true });
-    await FileSystem.moveAsync({ from: tempFile, to: indexFile });
+    const migration = migrateHistoryIndexDocument(parsed);
+    const cycles = validateIndexCycles(migration.document.cycles);
+    if (!cycles) return { kind: 'CORRUPT', reason: 'A lista de viagens contém registros inválidos.' };
+
+    const document: DriveCycleIndex = {
+      ...migration.document,
+      version: typeof migration.document.version === 'string' ? migration.document.version : '1.0',
+      schemaVersion: CURRENT_HISTORY_SCHEMA_VERSION,
+      cycles,
+      totalCount: cycles.length,
+    };
+    return { kind: 'VALID', document, migrated: migration.migrated };
   } catch (cause) {
-    throw new Error('FALHA_AO_SUBSTITUIR_INDICE; BACKUP_PRESERVADO: ' +
-      (cause instanceof Error ? cause.message : String(cause)));
+    return {
+      kind: 'CORRUPT',
+      reason: cause instanceof Error ? cause.message : 'Falha ao validar o índice.',
+    };
+  }
+}
+
+async function readCyclesFromFile(filePath: string): Promise<DriveCycle[] | null> {
+  const inspected = await inspectIndexFile(filePath);
+  if (inspected.kind !== 'VALID') return null;
+  return inspected.document.cycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
+}
+
+async function preserveVerifiedMainAsPrevious(
+  indexFile: string,
+  main: IndexInspection,
+  previous: IndexInspection,
+): Promise<void> {
+  if (main.kind !== 'VALID') return;
+  if (previous.kind === 'FUTURE') {
+    throw new Error('HISTORY_PREVIOUS_SCHEMA_VERSION_NEWER_THAN_APP; CÓPIA ANTERIOR PRESERVADA.');
+  }
+  if (previous.kind === 'CORRUPT') {
+    throw new Error('HISTORY_PREVIOUS_JSON_CORRUPTED; CÓPIA ANTERIOR PRESERVADA.');
+  }
+
+  const backup = indexBackupPath(indexFile);
+  const backupTemp = uniqueTemporaryPath(backup, 'backup-copy');
+  try {
+    await FileSystem.copyAsync({ from: indexFile, to: backupTemp });
+    const copied = await inspectIndexFile(backupTemp);
+    if (copied.kind !== 'VALID' ||
+        copied.document.cycles.length !== main.document.cycles.length) {
+      throw new Error('BACKUP_PREVIO_DO_INDICE_NAO_VALIDADO; HISTORICO_NAO_SUBSTITUIDO.');
+    }
+    if (previous.kind === 'VALID' || previous.kind === 'MISSING') {
+      if (previous.kind === 'VALID') await FileSystem.deleteAsync(backup, { idempotent: true });
+      await FileSystem.moveAsync({ from: backupTemp, to: backup });
+    }
+    const committedBackup = await inspectIndexFile(backup);
+    if (committedBackup.kind !== 'VALID' ||
+        committedBackup.document.cycles.length !== main.document.cycles.length) {
+      throw new Error('BACKUP_PREVIO_DO_INDICE_NAO_CONFIRMADO; HISTORICO_NAO_SUBSTITUIDO.');
+    }
+  } finally {
+    await FileSystem.deleteAsync(backupTemp, { idempotent: true }).catch(() => undefined);
+  }
+}
+
+async function persistIndexSnapshot(indexFile: string, data: Omit<DriveCycleIndex, 'schemaVersion'> & { schemaVersion?: number }): Promise<void> {
+  const main = await inspectIndexFile(indexFile);
+  const previous = await inspectIndexFile(indexBackupPath(indexFile));
+
+  // Nunca substituir um JSON principal corrompido ou criado por versão futura.
+  if (main.kind === 'FUTURE') {
+    recordStorageHealthIssue('FUTURE_SCHEMA', 'Schema futuro do histórico', 'O índice de viagens pertence a uma versão mais nova. Nenhuma gravação foi executada.', 'critical');
+    throw new Error('HISTORY_SCHEMA_VERSION_NEWER_THAN_APP; HISTÓRICO PRESERVADO SEM DOWNGRADE.');
+  }
+  if (main.kind === 'CORRUPT') {
+    recordStorageHealthIssue('HISTORY_CORRUPTED', 'Histórico JSON corrompido', main.reason + ' O arquivo original foi preservado e a gravação foi bloqueada.', 'critical');
+    throw new Error('HISTORICO_DE_VIAGENS_CORROMPIDO; ARQUIVO ORIGINAL PRESERVADO; GRAVACAO BLOQUEADA.');
+  }
+  if (previous.kind === 'FUTURE') {
+    recordStorageHealthIssue('FUTURE_SCHEMA', 'Schema futuro na cópia anterior', 'A cópia anterior do índice pertence a uma versão mais nova. Nenhuma gravação foi executada.', 'critical');
+    throw new Error('HISTORY_PREVIOUS_SCHEMA_VERSION_NEWER_THAN_APP; CÓPIA PRESERVADA.');
+  }
+  if (previous.kind === 'CORRUPT') {
+    recordStorageHealthIssue('HISTORY_CORRUPTED', 'Cópia anterior do histórico inválida', previous.reason + ' A cópia foi preservada e a gravação foi bloqueada.', 'critical');
+    throw new Error('HISTORY_PREVIOUS_JSON_CORRUPTED; CÓPIA PRESERVADA; GRAVACAO BLOQUEADA.');
+  }
+
+  const snapshot: DriveCycleIndex = {
+    ...data,
+    schemaVersion: CURRENT_HISTORY_SCHEMA_VERSION,
+    totalCount: data.cycles.length,
+  };
+  const tempFile = uniqueTemporaryPath(indexFile, 'snapshot');
+  try {
+    const serialized = JSON.stringify(snapshot, null, 2);
+    await FileSystem.writeAsStringAsync(tempFile, serialized, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    const temp = await inspectIndexFile(tempFile);
+    if (temp.kind !== 'VALID' ||
+        temp.document.schemaVersion !== CURRENT_HISTORY_SCHEMA_VERSION ||
+        temp.document.cycles.length !== snapshot.cycles.length ||
+        temp.document.totalCount !== snapshot.cycles.length) {
+      throw new Error('VALIDACAO_DO_INDICE_TEMPORARIO_FALHOU; ÍNDICE PRINCIPAL PRESERVADO.');
+    }
+
+    await preserveVerifiedMainAsPrevious(indexFile, main, previous);
+
+    const currentMain = await FileSystem.getInfoAsync(indexFile);
+    if (currentMain.exists) await FileSystem.deleteAsync(indexFile, { idempotent: true });
+    await FileSystem.moveAsync({ from: tempFile, to: indexFile });
+
+    const committed = await inspectIndexFile(indexFile);
+    if (committed.kind !== 'VALID' ||
+        committed.document.schemaVersion !== CURRENT_HISTORY_SCHEMA_VERSION ||
+        committed.document.cycles.length !== snapshot.cycles.length ||
+        committed.document.totalCount !== snapshot.cycles.length) {
+      throw new Error('VALIDACAO_DO_INDICE_COMMITADO_FALHOU.');
+    }
+    clearStorageHealthIssue('HISTORY_CORRUPTED');
+    clearStorageHealthIssue('FUTURE_SCHEMA');
+  } catch (cause) {
+    await FileSystem.deleteAsync(tempFile, { idempotent: true }).catch(() => undefined);
+    const now = await FileSystem.getInfoAsync(indexFile);
+    if (!now.exists && main.kind === 'VALID') {
+      const backup = await inspectIndexFile(indexBackupPath(indexFile));
+      if (backup.kind === 'VALID') {
+        await FileSystem.copyAsync({ from: indexBackupPath(indexFile), to: indexFile });
+      }
+    }
+    throw cause;
+  } finally {
+    await FileSystem.deleteAsync(tempFile, { idempotent: true }).catch(() => undefined);
   }
 }
 
@@ -101,215 +253,149 @@ export async function initializeDriveCycles(basePath: string): Promise<void> {
 
   return serializeIndexWrite(indexFile, async () => {
     await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
-    const indexInfo = await FileSystem.getInfoAsync(indexFile);
-    if (indexInfo.exists) {
-      // Upgrade old installations in place, retaining real/simulated records and
-      // removing only explicitly imported CarScanner reference trips.
-      if (!indexInfo.isDirectory) {
-        try {
-          const parsed = JSON.parse(await FileSystem.readAsStringAsync(indexFile)) as {
-            version?: string;
-            initializedAt?: string;
-            cycles?: unknown;
-            totalCount?: number;
-            [key: string]: unknown;
-          };
-          const originalCycles = Array.isArray(parsed.cycles) ? parsed.cycles : [];
-          const hasSeed = originalCycles.some(
-            (cycle) => typeof cycle === 'object' && cycle !== null &&
-              (cycle as { source?: unknown }).source === 'CARSCANNER_SEED',
-          );
-          if (hasSeed) {
-            const invalidNonSeeds = originalCycles.some((cycle) =>
-              !(typeof cycle === 'object' && cycle !== null &&
-                (cycle as { source?: unknown }).source === 'CARSCANNER_SEED') &&
-              !isDriveCycle(cycle),
-            );
-            if (invalidNonSeeds) throw new Error('INDEX_HAS_INVALID_CYCLES_DURING_MIGRATION');
-            const cycles = cyclesFromUnknown(originalCycles).filter(
-              (cycle) => cycle.source !== 'CARSCANNER_SEED',
-            );
-            const previousFile = indexBackupPath(indexFile);
-            await FileSystem.deleteAsync(previousFile, { idempotent: true });
-            await FileSystem.copyAsync({ from: indexFile, to: previousFile });
-            if (await readCyclesFromFile(previousFile) === null) {
-              throw new Error('BACKUP_PREVIO_DO_INDICE_NAO_VALIDADO');
-            }
-            await persistIndexSnapshot(indexFile, {
-              ...parsed,
-              version: typeof parsed.version === 'string' ? parsed.version : '1.0',
-              cycles,
-              totalCount: cycles.length,
-              lastModified: new Date().toISOString(),
-            });
-          }
-        } catch (cause) {
-          // Never overwrite an index that could not be read or validated.
-          console.warn('[trips] índice existente não foi migrado:', cause instanceof Error ? cause.message : cause);
-        }
+    const main = await inspectIndexFile(indexFile);
+
+    if (main.kind === 'FUTURE') {
+      recordStorageHealthIssue('FUTURE_SCHEMA', 'Schema futuro do histórico', 'Índice de viagens na versão ' + main.version + '; versão atual do aplicativo: ' + CURRENT_HISTORY_SCHEMA_VERSION + '. O arquivo foi preservado.', 'critical');
+      throw new Error('HISTORY_SCHEMA_VERSION_NEWER_THAN_APP; HISTÓRICO PRESERVADO.');
+    }
+    if (main.kind === 'CORRUPT') {
+      recordStorageHealthIssue('HISTORY_CORRUPTED', 'Histórico JSON corrompido', main.reason + ' O índice original foi preservado; nenhuma migração foi executada.', 'critical');
+      throw new Error('HISTORICO_DE_VIAGENS_CORROMPIDO; MIGRACAO BLOQUEADA; ARQUIVO PRESERVADO.');
+    }
+
+    if (main.kind === 'VALID') {
+      const cycles = main.document.cycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
+      const hasSeed = cycles.length !== main.document.cycles.length;
+      if (main.migrated || hasSeed || main.document.totalCount !== cycles.length) {
+        await persistIndexSnapshot(indexFile, {
+          ...main.document,
+          cycles,
+          totalCount: cycles.length,
+          lastModified: new Date().toISOString(),
+        });
       }
       return;
     }
 
-    // If the main index disappeared during a previous replacement, recover the
-    // validated previous snapshot before considering an empty installation.
-    const previousFile = indexBackupPath(indexFile);
-    const previousInfo = await FileSystem.getInfoAsync(previousFile);
-    if (previousInfo.exists) {
-      const backupCycles = await readCyclesFromFile(previousFile);
-      if (backupCycles === null) {
-        throw new Error('BACKUP_DO_HISTORICO_CORROMPIDO; HISTORICO_NAO_SUBSTITUIDO');
-      }
+    const previous = await inspectIndexFile(indexBackupPath(indexFile));
+    if (previous.kind === 'FUTURE') {
+      recordStorageHealthIssue('FUTURE_SCHEMA', 'Schema futuro na cópia anterior', 'A recuperação foi bloqueada para não substituir dados de uma versão mais nova.', 'critical');
+      throw new Error('HISTORY_PREVIOUS_SCHEMA_VERSION_NEWER_THAN_APP; CÓPIA PRESERVADA.');
+    }
+    if (previous.kind === 'CORRUPT') {
+      recordStorageHealthIssue('HISTORY_CORRUPTED', 'Cópia anterior do histórico inválida', previous.reason + ' Nenhum índice vazio foi criado.', 'critical');
+      throw new Error('BACKUP_DO_HISTORICO_CORROMPIDO; HISTORICO_NAO_SUBSTITUIDO.');
+    }
+    if (previous.kind === 'VALID') {
       await persistIndexSnapshot(indexFile, {
-        version: '1.0',
-        initializedAt: new Date().toISOString(),
-        cycles: backupCycles,
-        totalCount: backupCycles.length,
+        ...previous.document,
+        cycles: previous.document.cycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED'),
+        totalCount: previous.document.cycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED').length,
       });
       return;
     }
 
-    // New installations start with no trips. CarScanner seed data remains
-    // available only as a separately identified learning/reference baseline.
-    const emptyData = {
+    await persistIndexSnapshot(indexFile, {
       version: '1.0',
-      initializedAt: new Date().toISOString(),
-      cycles: [] as DriveCycle[],
+      cycles: [],
       totalCount: 0,
-    };
-    await persistIndexSnapshot(indexFile, emptyData);
+      initializedAt: new Date().toISOString(),
+    });
   });
-}
-
-async function readCyclesFromFile(filePath: string): Promise<DriveCycle[] | null> {
-  try {
-    const info = await FileSystem.getInfoAsync(filePath);
-    if (!info.exists || info.isDirectory) return null;
-    const data = JSON.parse(await FileSystem.readAsStringAsync(filePath)) as { cycles?: unknown };
-    if (!Array.isArray(data.cycles)) return null;
-    const onlySeeds = data.cycles.every((cycle) =>
-      typeof cycle === 'object' && cycle !== null &&
-      (cycle as { source?: unknown }).source === 'CARSCANNER_SEED',
-    );
-    const valid = cyclesFromUnknown(data.cycles);
-    const invalidNonSeeds = data.cycles.some((cycle) =>
-      !(typeof cycle === 'object' && cycle !== null &&
-        (cycle as { source?: unknown }).source === 'CARSCANNER_SEED') &&
-      !isDriveCycle(cycle),
-    );
-    if (invalidNonSeeds || (data.cycles.length > 0 && valid.length === 0 && !onlySeeds)) return null;
-    return valid.filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
-  } catch {
-    return null;
-  }
 }
 
 export async function readDriveCycles(basePath: string): Promise<DriveCycle[]> {
   const indexFile = `${basePath}/VIAGENS/index.json`;
-  const main = await readCyclesFromFile(indexFile);
-  if (main) return main;
-  return (await readCyclesFromFile(indexBackupPath(indexFile))) ?? [];
+  const main = await inspectIndexFile(indexFile);
+  if (main.kind === 'VALID') return main.document.cycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
+
+  if (main.kind === 'FUTURE') {
+    recordStorageHealthIssue('FUTURE_SCHEMA', 'Schema futuro do histórico', 'O índice de viagens pertence a uma versão mais nova. O conteúdo não foi alterado.', 'critical');
+    throw new Error('HISTORY_SCHEMA_VERSION_NEWER_THAN_APP; HISTÓRICO PRESERVADO.');
+  }
+
+  if (main.kind === 'CORRUPT') {
+    recordStorageHealthIssue('HISTORY_CORRUPTED', 'Histórico JSON corrompido', main.reason + ' A leitura tentará apenas a cópia anterior validada; nenhuma gravação será feita.', 'critical');
+    const previous = await readCyclesFromFile(indexBackupPath(indexFile));
+    if (previous !== null) return previous;
+    throw new Error('HISTORICO_DE_VIAGENS_CORROMPIDO_SEM_COPIA_VALIDADA; ARQUIVO PRESERVADO.');
+  }
+
+  const previous = await inspectIndexFile(indexBackupPath(indexFile));
+  if (previous.kind === 'VALID') return previous.document.cycles.filter((cycle) => cycle.source !== 'CARSCANNER_SEED');
+  if (previous.kind === 'FUTURE') {
+    recordStorageHealthIssue('FUTURE_SCHEMA', 'Schema futuro na cópia anterior', 'A cópia anterior pertence a uma versão mais nova; não foi alterada.', 'critical');
+    throw new Error('HISTORY_PREVIOUS_SCHEMA_VERSION_NEWER_THAN_APP; CÓPIA PRESERVADA.');
+  }
+  if (previous.kind === 'CORRUPT') {
+    recordStorageHealthIssue('HISTORY_CORRUPTED', 'Cópia anterior do histórico inválida', previous.reason + ' Nenhum histórico vazio foi presumido.', 'critical');
+    throw new Error('BACKUP_DO_HISTORICO_CORROMPIDO; HISTORICO_NAO_SUBSTITUIDO.');
+  }
+  return [];
 }
 
 export async function addDriveCycle(basePath: string, cycle: DriveCycle): Promise<void> {
+  if (!isDriveCycle(cycle) || cycle.source === 'CARSCANNER_SEED') {
+    throw new Error('VIAGEM_INVALIDA_OU_SEED_NAO_PODE_SER_PERSISTIDO_NO_HISTORICO_REAL.');
+  }
+
   const viagensDir = `${basePath}/VIAGENS`;
   const indexFile = `${viagensDir}/index.json`;
   return serializeIndexWrite(indexFile, async () => {
-  await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
+    await FileSystem.makeDirectoryAsync(viagensDir, { intermediates: true });
+    const main = await inspectIndexFile(indexFile);
+    let data: DriveCycleIndex;
 
-  let data: { version: string; cycles: DriveCycle[]; totalCount: number; lastModified?: string } = {
-    version: '1.0',
-    cycles: [],
-    totalCount: 0,
-  };
+    if (main.kind === 'FUTURE') {
+      recordStorageHealthIssue('FUTURE_SCHEMA', 'Schema futuro do histórico', 'Gravação de viagem bloqueada; o índice pertence a uma versão mais nova.', 'critical');
+      throw new Error('HISTORY_SCHEMA_VERSION_NEWER_THAN_APP; GRAVACAO_DE_VIAGEM_BLOQUEADA.');
+    }
+    if (main.kind === 'CORRUPT') {
+      recordStorageHealthIssue('HISTORY_CORRUPTED', 'Histórico JSON corrompido', main.reason + ' A gravação foi bloqueada e o arquivo original foi preservado.', 'critical');
+      throw new Error('HISTORICO_DE_VIAGENS_CORROMPIDO; GRAVACAO_BLOQUEADA; ARQUIVO PRESERVADO.');
+    }
 
-  const info = await FileSystem.getInfoAsync(indexFile);
-  let mainIsValid = !info.exists;
-  if (info.exists && !info.isDirectory) {
-    try {
-      const parsed = JSON.parse(await FileSystem.readAsStringAsync(indexFile)) as {
-        version?: string;
-        cycles?: unknown;
-        totalCount?: number;
-      };
-      if (!Array.isArray(parsed.cycles)) throw new Error('INDEX_CYCLES_NOT_ARRAY');
-      const invalidNonSeeds = parsed.cycles.some((item) =>
-        !(typeof item === 'object' && item !== null &&
-          (item as { source?: unknown }).source === 'CARSCANNER_SEED') &&
-        !isDriveCycle(item),
-      );
-      if (invalidNonSeeds) throw new Error('INDEX_HAS_INVALID_CYCLES');
-      const validCycles = cyclesFromUnknown(parsed.cycles).filter((item) => item.source !== 'CARSCANNER_SEED');
+    if (main.kind === 'VALID') {
       data = {
-        version: typeof parsed.version === 'string' ? parsed.version : '1.0',
-        cycles: validCycles,
-        totalCount: validCycles.length,
+        ...main.document,
+        cycles: main.document.cycles.filter((item) => item.source !== 'CARSCANNER_SEED'),
       };
-      mainIsValid = true;
-    } catch (mainError) {
-      const backupCycles = await readCyclesFromFile(indexBackupPath(indexFile));
-      if (backupCycles === null) {
-        throw new Error('HISTORICO_DE_VIAGENS_CORROMPIDO; ARQUIVO PRESERVADO PARA RECUPERACAO');
-      }
-      data = { version: '1.0', cycles: backupCycles, totalCount: backupCycles.length };
-      mainIsValid = false;
+    } else {
+      const previous = await inspectIndexFile(indexBackupPath(indexFile));
+      if (previous.kind === 'FUTURE') throw new Error('HISTORY_PREVIOUS_SCHEMA_VERSION_NEWER_THAN_APP; GRAVACAO BLOQUEADA.');
+      if (previous.kind === 'CORRUPT') throw new Error('BACKUP_DO_HISTORICO_CORROMPIDO; GRAVACAO BLOQUEADA.');
+      data = previous.kind === 'VALID'
+        ? { ...previous.document, cycles: previous.document.cycles.filter((item) => item.source !== 'CARSCANNER_SEED') }
+        : { version: '1.0', schemaVersion: CURRENT_HISTORY_SCHEMA_VERSION, cycles: [], totalCount: 0 };
     }
-  } else if (info.exists && info.isDirectory) {
-    throw new Error('INDEX_DE_VIAGENS_E_DIRETORIO; NENHUMA GRAVACAO EXECUTADA');
-  } else if (!info.exists) {
-    // A missing main index can be the result of interrupted replacement.
-    // If a previous snapshot exists, it must be validated and restored rather
-    // than silently starting with empty history.
-    const previousPath = indexBackupPath(indexFile);
-    const previousInfo = await FileSystem.getInfoAsync(previousPath);
-    if (previousInfo.exists) {
-      const backupCycles = await readCyclesFromFile(previousPath);
-      if (backupCycles === null) {
-        throw new Error('BACKUP_DO_HISTORICO_CORROMPIDO; HISTORICO_NAO_SUBSTITUIDO');
-      }
-      data = { version: '1.0', cycles: backupCycles, totalCount: backupCycles.length };
-    }
-  }
 
-  data.cycles = data.cycles.filter((item) => item.id !== cycle.id);
-  data.cycles.push(cycle);
-  data.totalCount = data.cycles.length;
-  data.lastModified = new Date().toISOString();
+    const existingIndex = data.cycles.findIndex((item) => item.id === cycle.id);
+    if (existingIndex >= 0) data.cycles[existingIndex] = cycle;
+    else data.cycles.push(cycle);
+    data.totalCount = data.cycles.length;
+    data.lastModified = new Date().toISOString();
+    await persistIndexSnapshot(indexFile, data);
 
-  // Preserve the last known-good index before replacement. Do not copy a
-  // corrupt main index over the backup when recovering from backup.
-  const previousFile = indexBackupPath(indexFile);
-  if (info.exists && mainIsValid) {
-    await FileSystem.deleteAsync(previousFile, { idempotent: true });
-    await FileSystem.copyAsync({ from: indexFile, to: previousFile });
-    const backup = await readCyclesFromFile(previousFile);
-    if (backup === null) {
-      throw new Error('BACKUP_PREVIO_DO_INDICE_NAO_VALIDADO; HISTORICO_NAO_SUBSTITUIDO');
-    }
-  }
-  await persistIndexSnapshot(indexFile, data);
-
-  const parsedStart = Date.parse(cycle.startedAt);
-  const csvDate = new Date(Number.isFinite(parsedStart) ? parsedStart : Date.now());
-  const today = localDateKey(csvDate);
-  const csvFile = `${viagensDir}/viagens_${today}.csv`;
-
-  const row: CsvRow = {
-    id: cycle.id,
-    timestamp: cycle.startedAt,
-    distanceTotalKm: cycle.distanceTotalKm,
-    distanceIceKm: cycle.distanceIceKm,
-    fuelUsedL: cycle.fuelUsedL,
-    totalTime: cycle.totalTimeHms,
-    drivingTime: cycle.drivingTimeHms,
-    standingTime: cycle.standingTimeHms,
-    avgSpeed: cycle.avgDrivingSpeedKmh,
-    maxSpeed: cycle.maxSpeedKmh ?? '',
-    avgConsumption: cycle.fuelDataValid === false ? '' : cycle.avgFuelConsumptionKml,
-    telemetrySamples: cycle.telemetrySamples?.length ?? 0,
-    source: cycle.source,
-  };
-
-  await appendCsvRow(csvFile, row);
+    const parsedStart = Date.parse(cycle.startedAt);
+    const csvDate = new Date(Number.isFinite(parsedStart) ? parsedStart : Date.now());
+    const today = localDateKey(csvDate);
+    const csvFile = `${viagensDir}/viagens_${today}.csv`;
+    const row: CsvRow = {
+      id: cycle.id,
+      timestamp: cycle.startedAt,
+      distanceTotalKm: cycle.distanceTotalKm,
+      distanceIceKm: cycle.distanceIceKm,
+      fuelUsedL: cycle.fuelUsedL,
+      totalTime: cycle.totalTimeHms,
+      drivingTime: cycle.drivingTimeHms,
+      standingTime: cycle.standingTimeHms,
+      avgSpeed: cycle.avgDrivingSpeedKmh,
+      maxSpeed: cycle.maxSpeedKmh ?? '',
+      avgConsumption: cycle.fuelDataValid === false ? '' : cycle.avgFuelConsumptionKml,
+      telemetrySamples: cycle.telemetrySamples?.length ?? 0,
+      source: cycle.source,
+    };
+    await appendCsvRow(csvFile, row);
   });
 }
