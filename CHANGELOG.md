@@ -7,13 +7,14 @@
 - Bluetooth: atualiza o teste de retry para validar a implementação limitada em `bluetoothManager.ts` e a reutilização da lista de pareados durante a varredura.
 - CI: o gate de baseline valida a publicação de APK na `main` e em PRs do mesmo repositório, sem exigir visibilidade privada nem permitir upload de forks.
 
-- CI: mantém a publicação do APK standalone e do SHA-256 como artefato somente na branch main, inclusive no repositório público, com retenção de 14 dias; PRs continuam compilando e verificando sem publicar artefatos.
 
 ### Histórico, autosave e logs CSV
 - `VIAGENS/index.json` passa a ser a única fonte persistente de viagens; inicialização deduplica por ID, preserva a viagem com telemetria mais completa e reconcilia registros de autosaves antigos.
 - Novos autosaves não duplicam o histórico completo de viagens; a memória de runtime continua hidratada para as telas e relatórios.
 - Resumos CSV de viagem são idempotentes por ID, evitando linhas repetidas quando o fechamento da viagem é repetido.
 - CSVs diários de telemetria giram em partes de 512 KiB; filas grandes são persistidas em chunks CSV verificados em vez de descartar imediatamente as amostras.
+- O overflow CSV agora vira segmentos canônicos `.csv`/`.part-NNNN.csv`; cada chunk é validado em arquivo temporário antes da movimentação para o nome final, com enumeração das partes disponível após reinício.
+- O spool une as colunas presentes no lote e limita cada chunk por bytes (além do limite de linhas), evitando omissão de campos e segmentos de overflow acima de 512 KiB.
 - SQLite não foi introduzido nesta etapa: a decisão continua condicionada a medir no aparelho volume, latência, concorrência, consultas e restauração antes de migrar dados existentes.
 
 ### GPS / background location
