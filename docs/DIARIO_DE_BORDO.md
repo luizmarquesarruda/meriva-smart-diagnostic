@@ -1,5 +1,7 @@
 ## ESTADO VIGENTE — 2026-10-31 (P0/P1 robustez de viagens, JSON, backup, Bluetooth e GPS)
 
+- DB-199 — Gate de baseline alinhado à política de APK público: exige upload somente na `main`, não exige visibilidade privada e confere retenção de 14 dias.
+- A execução de PR continua validando TypeScript, testes e build Android sem publicar o APK; nenhum Release automático ou permissão de escrita foi adicionado.
 - DB-198 — Política de artefato CI: compilar e verificar APK em PRs, mas publicar o APK e SHA-256 somente em execuções da branch `main`, com retenção de 14 dias.
 - A alteração reconcilia a regra de upload com a decisão de manter o artefato público sem criar Releases automáticas nem publicar APKs de branches de trabalho.
 - DB-197 — Branch de integração: `fix/storage-and-history-integrity-20261031`, sobre o estado de `main` documentado em 31/10/2026. Escopo ampliado para preservar viagens pendentes, endurecer JSON local, coordenar snapshots, cancelar descoberta Bluetooth e manter GPS foreground em falha de background.
@@ -309,6 +311,7 @@
 - **DB-196** · 2026-10-31 — Versionamento do índice de viagens e observabilidade dos buffers
 - **DB-197** · 2026-10-31 — Endurecer finalização de viagens, persistência JSON, backup, Bluetooth e GPS
 - **DB-198** · 2026-10-31 — Preservar artefato APK público somente na main
+- **DB-199** · 2026-10-31 — Alinhar gate de CI à política do APK público
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -5068,3 +5071,15 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Esta alteração foi preparada na branch fix/storage-and-history-integrity-20261031 para disparar a CI sobre o novo HEAD.
 - A aprovação depende de gate:baseline, validate e android-build verdes no SHA resultante. Nenhum resultado é presumido.
 - A distribuição pública depende de uma execução posterior em main; a execução de PR deve apenas compilar e verificar o APK.
+
+## DB-199 · 2026-10-31 — Alinhar gate de CI à política do APK público
+
+### Correção
+- O teste de baseline deixou de exigir que o repositório seja privado para permitir o upload do APK.
+- O gate agora exige que a etapa de upload use a condição exata `github.ref == 'refs/heads/main'` e rejeita dependência de visibilidade do repositório.
+- A retenção esperada foi atualizada de 3 para 14 dias, conforme o workflow.
+- PRs continuam compilando e validando o APK, mas não fazem upload; a política de não criar Releases automáticas e de manter permissões somente de leitura permanece.
+
+### Validação
+- Corrigidos teste, changelog e este diário no mesmo commit para evitar execuções intermediárias da CI.
+- A CI deve confirmar `gate:baseline`, `validate` e `android-build` no SHA final. Até esses jobs terminarem, a PR não deve ser mesclada.
