@@ -163,13 +163,13 @@ async function main() {
 
   // A normal append that would cross 512 KiB must rotate rather than enlarge the prior segment.
   const rotationPath = '/base/LOGS/obd_raw_2026-11-01_rotation.csv';
-  const header = 'timestamp,eventId,pid\\n';
+  const header = 'timestamp,eventId,pid\n';
   const existingPrefix = '2026-11-01T09:00:00.000Z,existing,';
   const largeValue = 'x'.repeat(restartedLogger.MAX_CSV_SEGMENT_BYTES
     - Buffer.byteLength(header, 'utf8')
     - Buffer.byteLength(existingPrefix, 'utf8')
     - 16);
-  const originalSegment = header + existingPrefix + largeValue + '\\n';
+  const originalSegment = header + existingPrefix + largeValue + '\n';
   files.set(rotationPath, originalSegment);
   await restartedLogger.appendCsvRowIfMissing(
     rotationPath,
@@ -192,7 +192,7 @@ async function main() {
   // Pre-upgrade .queue-* files remain visible and participate in ID deduplication.
   const legacyQueuePath = '/base/LOGS/obd_raw_2026-11-01.queue-1793520000000-000001.csv';
   files.set(legacyQueuePath,
-    'timestamp,eventId,pid,extra\\n2026-11-01T10:00:00.008Z,event-legacy,010C,legacy-column\\n');
+    'timestamp,eventId,pid,extra\n2026-11-01T10:00:00.008Z,event-legacy,010C,legacy-column\n');
   const withLegacyQueue = await restartedLogger.getCsvLogSegments(filePath);
   assert.ok(withLegacyQueue.includes(legacyQueuePath),
     'legacy overflow files must remain readable after upgrading');
