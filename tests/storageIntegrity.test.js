@@ -416,6 +416,12 @@ async function main() {
   const listedBackups = await backup.listVerifiedBackups(backupBase);
   assert.ok(listedBackups.some((item) => item.name === legacyName),
     'backups antigos com LEITURAS/LOGS devem continuar válidos para restauração');
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  const legacyRestore = await backup.restoreBackup(backupBase, legacyName);
+  assert.ok(legacyRestore.includes.includes('LEITURAS') && legacyRestore.includes.includes('LOGS'),
+    'a restauração legada deve recuperar as pastas que estavam presentes no manifesto');
+  assert.equal(files.get(backupBase + '/LEITURAS/historico.csv'), 'CSV legado preservado');
+  assert.equal(files.get(backupBase + '/LOGS/historico.csv'), 'CSV legado preservado');
 
   Module._load = originalLoad;
   console.log('storageIntegrity.test.js: PASS');
