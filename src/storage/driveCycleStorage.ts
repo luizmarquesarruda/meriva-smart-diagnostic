@@ -36,7 +36,7 @@ async function hasFutureHistorySchema(indexFile: string): Promise<boolean> {
   }
 }
 
-function isDriveCycle(value: unknown): value is DriveCycle {
+export function isDriveCycle(value: unknown): value is DriveCycle {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const cycle = value as Partial<DriveCycle>;
   const finiteNonNegative = (item: unknown): item is number =>
