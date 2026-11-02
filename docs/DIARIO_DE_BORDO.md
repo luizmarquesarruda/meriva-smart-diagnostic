@@ -1,4 +1,4 @@
-## ESTADO VIGENTE — 2026-10-31 (P0 relatórios, layout e estabilidade)
+## ESTADO VIGENTE — 2026-11-02 (P0 layout instalado e proveniência do APK)
 
 > PR #105 integrada em `main` no commit `b128b413427e612e621dc2ef2c82b6c2476ce659`. PR #104 integrada em `main` no commit `4055a776a4e95e1ec775c6b0ae039da234a7c6c6`. Ambas passaram `validate` e `android-build` nos respectivos SHAs finais.
 
@@ -9,10 +9,10 @@
 - Validação PR #105: `validate` e `android-build` passaram no SHA `ff131e9b23ad745955dfe59904025a47cafabc98`.
 - Validação PR #104: `validate` e `android-build` passaram no SHA `2cdbda3807a50e68cd1fe24fe3ff207dc125dbfd`.
 - A CI também passou no push da `main` após a integração da PR #105, SHA `b128b413427e612e621dc2ef2c82b6c2476ce659`. O push de main após o merge da #104 está em execução e deve ser consultado no SHA final correspondente.
-- O repositório permanece público conforme a decisão operacional original. A CI compila/verifica APK, mas não cria Release pública nem publica APK automaticamente; não alterar visibilidade ou distribuição.
-- O índice e os títulos do Diário estão alinhados até DB-193; esta atualização registra as correções de GPS por posição e a recuperação atômica do histórico.
+- O repositório permanece público. PR #108 foi integrada por squash em `24651428eb4dff69ad3086627e739df07c1de4dd`: o upload do APK passou a ocorrer apenas em push para `main`, com retenção de 14 dias; não cria GitHub Release nem publica em branches/PRs.
+- O índice e os títulos do Diário estão alinhados até DB-194; DB-195 registra a divergência visual observada no APK instalado e a correção da publicação rastreável.
 - Não declarar inspeção visual ou teste físico no Galaxy A06 / SM-A065M / Android 16. Permanecem necessários screenshots em retrato/paisagem e teste ELM327/ECU real, incluindo respostas 010C/012F.
-- A próxima etapa operacional é instalar o APK produzido pela CI e executar inspeção visual e teste físico; registrar respostas RAW, protocolo, resposta ECU, leitura 012F e resultado do percurso/autonomia antes de alterar algoritmos GPS/combustível.
+- A execução CI da PR #108 (run `41205305161`, HEAD `83f702bd7d5247e53f5291f7806477ecdcf3e981`) aprovou `validate` e `android-build`; o upload foi corretamente ignorado por ser evento de PR. O push subsequente na `main` precisa concluir e publicar o artefato do SHA atual antes de enviar novo link de APK.
 
 
 ---
@@ -285,6 +285,7 @@
 - **DB-192** · 2026-10-31 — Integrar layout e relatórios, consolidar P0 e registrar validação dos SHAs finais
 - **DB-193** · 2026-10-31 — Velocidade derivada GPS e recuperação atômica do histórico ECU
 - **DB-194** · 2026-10-31 — Auditoria estática do layout no Galaxy A06 / Android 16
+- **DB-195** · 2026-11-02 — Divergência visual do APK instalado e rastreabilidade da publicação
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -4994,3 +4995,29 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Relatório detalhado: docs/AUDITORIA_LAYOUT_GALAXY_A06_ANDROID_16_2026-10-31.md.
 - Limite: auditoria estática de código/documentação. Nenhuma captura, instalação ou inspeção física do Galaxy A06 foi realizada nesta rodada. O teste visual no aparelho continua pendente.
 
+
+## DB-195 · 2026-11-02 — Divergência visual do APK instalado e rastreabilidade da publicação
+
+### Evidência observada
+- O usuário confirmou que instalou o APK obtido pelo link de download fornecido nesta conversa; portanto, a captura deve ser tratada como evidência da distribuição feita pelo assistente, não como instalação de origem desconhecida pelo usuário.
+- A captura mostra os quatro quadrantes OBD em N/D e o estado FALHA. Esses estados são compatíveis com ECU sem resposta/conexão não validada e não devem ser mascarados com dados simulados.
+- A captura não apresenta claramente o cartão horizontal completo de sessão/ECU (título, estado e orientação de toque) nem os cinco cartões independentes de navegação em retrato que estão no código atual. A área de alerta aparece isolada e há grande intervalo vertical até a navegação.
+- O SHA de compilação do APK entregue não ficou associado ao link registrado no contexto desta rodada. Não é tecnicamente possível atribuir a captura a um SHA específico nem declarar regressão confirmada no código de main apenas pela imagem.
+
+### Conferência do repositório
+- `main` antes deste registro continha a implementação integrada da PR #104: `sessionCard`, navegação independente em retrato, navegação lateral em paisagem e testes estruturais em `tests/cockpitNavigation.test.js` e `tests/orientationLayout.test.js`.
+- A PR #104 foi validada na CI run `41195016429`, SHA `2cdbda3807a50e68cd1fe24fe3ff207dc125dbfd`, com conclusão de sucesso.
+- A publicação da main pública estava bloqueada por condição `github.event.repository.visibility == 'private'` no workflow. PR #108 removeu essa condição, manteve o upload restrito a `refs/heads/main`, manteve checksum SHA-256 e retenção de 14 dias.
+- PR #108 foi validada na CI run `41205305161` (jobs `validate` e `android-build` concluídos com sucesso; o passo de upload foi ignorado na execução de PR) e integrada por squash no commit `24651428eb4dff69ad3086627e739df07c1de4dd`.
+
+### Decisão e segurança contra regressão
+- Nenhuma dimensão, cor, navegação ou lógica OBD foi alterada nesta auditoria: a origem do APK instalado não foi provada e o código atual contém os elementos que faltam na captura. Mudar o layout agora poderia degradar a versão correta sem corrigir a procedência do APK.
+- A nova execução de CI disparada pelo push na main precisa publicar o APK e o checksum. Só depois de confirmar o run/artefato e comparar um novo screenshot do mesmo SHA será possível decidir se existe regressão visual reproduzível.
+- Próxima melhoria de rastreabilidade: expor versão, SHA curto do commit e data/hora de compilação em uma tela Sobre/Diagnóstico e anexar os mesmos dados ao pacote de artefatos. Não inferir essas informações de `versionName` isoladamente.
+- Nenhuma alteração foi feita em Bluetooth Classic, ELM327/010C, autonomia/012F, GPS, dados OBD, SQLite ou histórico.
+
+### Validação pendente
+- Confirmar `gate:baseline`, `validate` e `android-build` no SHA de main disparado após a integração da PR #108.
+- Confirmar que o artefato APK e o checksum foram publicados nessa execução, baixar o APK e registrar seu SHA-256/commit de origem.
+- Repetir a inspeção no Galaxy A06 em retrato, paisagem, escala padrão e fonte ampliada; medir os cinco alvos interativos e verificar a exibição completa do cartão de sessão.
+- Validar Bluetooth/ECU separadamente: a imagem atual não comprova resposta 010C nem conexão funcional.
