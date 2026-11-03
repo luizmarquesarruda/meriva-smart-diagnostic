@@ -297,6 +297,7 @@
 - **DB-193** · 2026-10-31 — Velocidade derivada GPS e recuperação atômica do histórico ECU
 - **DB-194** · 2026-10-31 — Auditoria estática do layout no Galaxy A06 / Android 16
 - **DB-195** · 2026-11-02 — Divergência visual do APK instalado e rastreabilidade da publicação
+- **DB-196** · 2026-11-03 — Corrigir baseline para artefato APK em Pull Requests
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -5032,3 +5033,20 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Confirmar que o artefato APK e o checksum foram publicados nessa execução, baixar o APK e registrar seu SHA-256/commit de origem.
 - Repetir a inspeção no Galaxy A06 em retrato, paisagem, escala padrão e fonte ampliada; medir os cinco alvos interativos e verificar a exibição completa do cartão de sessão.
 - Validar Bluetooth/ECU separadamente: a imagem atual não comprova resposta 010C nem conexão funcional.
+
+
+## DB-196 · 2026-11-03 — Corrigir baseline para artefato APK em Pull Requests
+
+### Causa confirmada
+- A CI #4834 da PR #119 falhou em `tests/projectBaseline.test.js:45`: o teste ainda exigia upload limitado a `refs/heads/main`, embora o workflow já tivesse sido alterado para disponibilizar o APK como artefato de CI em PRs e branches.
+- `validate` parou no gate de baseline; `npm run validate` e `android-build` foram ignorados. Nenhum APK foi gerado nessa execução.
+
+### Correção aplicada
+- Atualizado o baseline para exigir upload como artefato de CI após validação e build Android, nome identificável por número de execução, retenção de 14 dias e checksum verificado antes do upload.
+- Mantidas as proteções: sem GitHub Release automático, sem permissão `contents: write`, build Android dependente de `validate` e workflow com permissões somente leitura.
+- Nenhuma alteração em Bluetooth Classic, ELM327/ECU, GPS, autonomia, telemetria ou armazenamento.
+
+### Validação
+- Commit de correção do baseline: `6c47fcc8883a53cbdb9882f7ec6801bd4aaf3a5d`.
+- Atualização deste diário documenta a causa e a correção; a nova CI ainda precisa confirmar gate, suíte completa, build Android e publicação do artefato.
+- Teste físico no Galaxy A06 / SM-A065M / Android 16: não validado. PR #119 permanece sem merge.
