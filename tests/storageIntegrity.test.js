@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const Module = require('node:module');
@@ -398,6 +399,32 @@ async function main() {
   assert.ok(!createdBackup.includes.includes('LOGS'), 'novos backups não devem copiar CSVs brutos de LOGS');
   assert.ok(files.has(backupBase + '/LEITURAS/leituras.csv'), 'a política de backup não pode apagar a origem LEITURAS');
   assert.ok(files.has(backupBase + '/LOGS/logs.csv'), 'a política de backup não pode apagar a origem LOGS');
+
+  const generatedBackupName = 'meriva_smart_' + createdBackup.timestamp;
+  const generatedBackupDir = backupBase + '/BACKUP/' + generatedBackupName;
+  const generatedManifest = JSON.parse(files.get(generatedBackupDir + '/manifest.json'));
+  assert.equal(generatedManifest.schemaVersion, 2, 'novos backups devem usar manifesto com integridade por arquivo');
+  const bancoManifest = generatedManifest.directories.find((entry) => entry.directory === 'BANCO');
+  const bancoFileManifest = bancoManifest.files.find((entry) => entry.path === 'banco.json');
+  assert.equal(
+    bancoFileManifest.sha256,
+    crypto.createHash('sha256').update('conteúdo', 'utf8').digest('hex'),
+    'manifesto deve registrar SHA-256 correto inclusive para conteúdo UTF-8',
+  );
+  const backedUpBancoPath = generatedBackupDir + '/BANCO/banco.json';
+  const originalBancoContent = files.get(backedUpBancoPath);
+  const sameSizeCorruption = originalBancoContent.slice(0, -1) + 'X';
+  assert.equal(Buffer.byteLength(sameSizeCorruption, 'utf8'), Buffer.byteLength(originalBancoContent, 'utf8'),
+    'fixture deve alterar o conteúdo sem alterar o tamanho');
+  files.set(backedUpBancoPath, sameSizeCorruption);
+  assert.ok(!(await backup.listVerifiedBackups(backupBase)).some((item) => item.name === generatedBackupName),
+    'backup com corrupção de mesmo tamanho deve deixar de ser considerado verificável');
+  await assert.rejects(
+    () => backup.restoreBackup(backupBase, generatedBackupName),
+    /BACKUP_FILE_HASH_MISMATCH/,
+    'restauração deve bloquear arquivo alterado com tamanho preservado',
+  );
+  files.set(backedUpBancoPath, originalBancoContent);
 
   const backupRoot = backupBase + '/BACKUP';
   const legacyName = 'meriva_smart_2026-10-30T00-00-00-000Z';
