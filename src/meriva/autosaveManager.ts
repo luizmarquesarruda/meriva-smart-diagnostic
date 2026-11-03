@@ -194,6 +194,7 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     // e um principal válido não autoriza substituir uma cópia anterior inválida.
     await assertAutosaveFileReplaceable(mainPath(base));
     await assertAutosaveFileReplaceable(previousPath(base));
+    await assertAutosaveFileReplaceable(tmpPath(base));
 
     await FileSystem.writeAsStringAsync(tmpPath(base), content, {
       encoding: FileSystem.EncodingType.UTF8,
