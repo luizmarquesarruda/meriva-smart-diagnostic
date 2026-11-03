@@ -363,6 +363,16 @@ test('5. schema futuro -> não destruir, usar fallback', async () => {
     99,
     'arquivo futuro não pode ser destruído',
   );
+  const mainBeforeSave = files.get(`${CONFIG_DIR}/autosave.json`);
+  const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
+  const previousBeforeSave = files.get(previousPath);
+  m.updateAutoSaveState((state) => { state.settings.posLoad = 'não pode substituir schema futuro'; });
+  assert.strictEqual(await m.saveNow('critical'), false,
+    'o próximo salvamento deve ser bloqueado quando o principal possui schema futuro');
+  assert.strictEqual(files.get(`${CONFIG_DIR}/autosave.json`), mainBeforeSave,
+    'o principal de schema futuro deve permanecer byte a byte');
+  assert.strictEqual(files.get(previousPath), previousBeforeSave,
+    'a cópia anterior válida não pode ser substituída pelo schema futuro');
 });
 
 test('6. SIMULACAO não contamina learning nem banco de PIDs', async () => {

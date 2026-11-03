@@ -959,6 +959,102 @@ async function testRawLogger() {
     'interpreted log must use the same local date, not the UTC day');
 }
 
+async function testAppSettingsCorruptionDoesNotOverwrite() {
+  resetFS();
+  const basePath = BASE + '/settings-corrupt';
+  const settings = loadTs(path.join(ROOT, 'src/database/appSettings.ts'));
+  const target = basePath + '/CONFIG/app-settings.json';
+  const original = '{CONFIGURAÇÕES CORROMPIDAS';
+  files.set(target, original);
+
+  const loaded = await settings.readAppSettings(basePath);
+  assert.strictEqual(loaded.fuelType, 'FLEX', 'a interface pode usar defaults somente em memória');
+  assert.strictEqual(files.get(target), original, 'a leitura nunca pode substituir o JSON corrompido');
+  await assert.rejects(
+    () => settings.writeAppSettings(basePath, { ...loaded, fuelType: 'ETANOL' }),
+    /JSON_CORRUPTED/,
+    'uma edição deve bloquear a gravação até recuperação explícita',
+  );
+  assert.strictEqual(files.get(target), original, 'a gravação bloqueada deve preservar o arquivo byte a byte');
+}
+
+async function testVehicleProfileCorruptionDoesNotRecreateFile() {
+  resetFS();
+  const basePath = BASE + '/vehicle-corrupt';
+  const vehicle = loadTs(path.join(ROOT, 'src/database/vehicleConfig.ts'));
+  const target = basePath + '/CONFIG/veiculo.json';
+  const original = '{PERFIL CORROMPIDO';
+  files.set(target, original);
+
+  const profile = await vehicle.ensureMerivaVehicleProfile(basePath);
+  assert.strictEqual(profile.make, 'Chevrolet', 'um perfil de sessão pode ser fornecido em memória');
+  assert.strictEqual(files.get(target), original, 'o bootstrap não pode recriar um perfil sobre o arquivo corrompido');
+  await assert.rejects(
+    () => vehicle.createVehicleProfile(basePath, profile),
+    /JSON_CORRUPTED/,
+    'a gravação explícita deve bloquear enquanto o original estiver inválido',
+  );
+  assert.strictEqual(files.get(target), original);
+}
+
+async function testLearningProfileCorruptionDoesNotResetLearning() {
+  resetFS();
+  const basePath = BASE + '/learning-corrupt';
+  const learning = loadTs(path.join(ROOT, 'src/database/learningProfile.ts'));
+  const target = basePath + '/APRENDIZADO/dna_meriva.json';
+  const original = '{APRENDIZADO CORROMPIDO';
+  files.set(target, original);
+
+  assert.strictEqual(await learning.readLearningProfile(basePath), null);
+  await learning.createLearningProfile(basePath, '2026-09-24T14:48:00.000Z');
+  assert.strictEqual(files.get(target), original,
+    'a inicialização não pode substituir o histórico de aprendizado corrompido por um perfil vazio');
+  await assert.rejects(
+    () => learning.saveLearningProfile(basePath, {
+      vehicleId: 'MERIVA_MAXX',
+      profileCreated: '2026-09-24T14:48:00.000Z',
+      lastUpdated: '2026-09-24T14:48:00.000Z',
+      seedVersion: 'NONE',
+      seedImportDate: '2026-09-24T14:48:00.000Z',
+      learningStatus: 'COLD_START',
+      confidenceThresholds: { low: 10, medium: 50, good: 200, high: 500 },
+      contextualData: [],
+      overallStatistics: {},
+      globalSampleCounts: { seedSamples: 0, realSamples: 0, totalSamples: 0 },
+      source: 'REAL_ONLY',
+      seedWeight: 0,
+      dataContamination: { simulationDetected: 0, simulationFiltered: 0 },
+    }),
+    /JSON_CORRUPTED/,
+  );
+  assert.strictEqual(files.get(target), original);
+}
+
+async function testMaintenanceCorruptionDoesNotEraseRecords() {
+  resetFS();
+  const basePath = BASE + '/maintenance-corrupt';
+  const maintenance = loadTs(path.join(ROOT, 'src/database/maintenanceStorage.ts'));
+  const target = basePath + '/MANUTENCAO/registros.json';
+  const original = '{MANUTENÇÃO CORROMPIDA';
+  files.set(target, original);
+
+  const loaded = await maintenance.readMaintenanceData(basePath);
+  assert.deepStrictEqual(loaded.fuelings, []);
+  await assert.rejects(
+    () => maintenance.writeMaintenanceData(basePath, loaded),
+    /JSON_CORRUPTED/,
+    'a edição não pode substituir registros ilegíveis por um JSON vazio',
+  );
+  assert.strictEqual(files.get(target), original);
+}
+
+async function testDataFilesFailClosed() {
+  await testAppSettingsCorruptionDoesNotOverwrite();
+  await testVehicleProfileCorruptionDoesNotRecreateFile();
+  await testLearningProfileCorruptionDoesNotResetLearning();
+  await testMaintenanceCorruptionDoesNotEraseRecords();
+}
+
 async function testVehicleProfile() {
   resetFS();
   const vehicle = loadTs(path.join(ROOT, 'src/database/vehicleConfig.ts'));
@@ -1519,6 +1615,7 @@ async function main() {
     ['Bluetooth por eventos', testBluetoothEventTransport],
     ['quota configurável', testQuota],
     ['logger TX/RX', testRawLogger],
+    ['JSON críticos falham fechados diante de corrupção', testDataFilesFailClosed],
     ['perfil do veículo', testVehicleProfile],
     ['drive cycles', testDriveCycleValidation],
     ['resumo de velocidade real ponderado', testDriveCycleSummaryUsesWeightedRealSpeed],
