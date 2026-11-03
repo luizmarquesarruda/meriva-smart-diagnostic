@@ -435,6 +435,64 @@ test('5b. cópia anterior de schema futuro bloqueia gravação sem alterar princ
   m.disposeAutoSave();
 });
 
+test('5c. temporário corrompido bloqueia gravação sem alterar os três arquivos', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  m.updateAutoSaveState((s) => { s.settings.fase = 'principal-valido'; });
+  await m.saveNow('critical');
+  m.updateAutoSaveState((s) => { s.settings.fase = 'anterior-valido'; });
+  await m.saveNow('critical');
+
+  const mainPath = `${CONFIG_DIR}/autosave.json`;
+  const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
+  const temporaryPath = `${CONFIG_DIR}/autosave.json.tmp`;
+  const mainBefore = files.get(mainPath);
+  const previousBefore = files.get(previousPath);
+  const corruptTemporary = '{TEMPORÁRIO CORROMPIDO';
+  files.set(temporaryPath, corruptTemporary);
+
+  m.updateAutoSaveState((s) => { s.settings.novaAlteracao = true; });
+  assert.strictEqual(await m.saveNow('critical'), false, 'temporário corrompido deve bloquear a gravação');
+  assert.strictEqual(files.get(mainPath), mainBefore);
+  assert.strictEqual(files.get(previousPath), previousBefore);
+  assert.strictEqual(files.get(temporaryPath), corruptTemporary, 'temporário corrompido deve permanecer intacto');
+  m.disposeAutoSave();
+});
+
+test('5d. temporário de schema futuro bloqueia gravação sem alterar os três arquivos', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  m.updateAutoSaveState((s) => { s.settings.fase = 'principal-valido'; });
+  await m.saveNow('critical');
+  m.updateAutoSaveState((s) => { s.settings.fase = 'anterior-valido'; });
+  await m.saveNow('critical');
+
+  const mainPath = `${CONFIG_DIR}/autosave.json`;
+  const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
+  const temporaryPath = `${CONFIG_DIR}/autosave.json.tmp`;
+  const mainBefore = files.get(mainPath);
+  const previousBefore = files.get(previousPath);
+  const futureTemporary = JSON.stringify({
+    schemaVersion: 99,
+    savedAt: new Date().toISOString(),
+    dataType: 'APP_STATE',
+    source: 'versao-futura',
+    payload: {},
+  });
+  files.set(temporaryPath, futureTemporary);
+
+  m.updateAutoSaveState((s) => { s.settings.novaAlteracao = true; });
+  assert.strictEqual(await m.saveNow('critical'), false, 'temporário de schema futuro deve bloquear a gravação');
+  assert.strictEqual(files.get(mainPath), mainBefore);
+  assert.strictEqual(files.get(previousPath), previousBefore);
+  assert.strictEqual(files.get(temporaryPath), futureTemporary, 'temporário futuro deve permanecer intacto');
+  m.disposeAutoSave();
+});
+
 test('6. SIMULACAO não contamina learning nem banco de PIDs', async () => {
   const m = manager();
   m.disposeAutoSave();
