@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased — Artefato APK em PRs
+## Unreleased — Artefato APK rastreável
 - CI agora publica o APK standalone e o SHA-256 em toda execução bem-sucedida do job Android, incluindo push em branches de PR, pull_request, main e execução manual.
-- O nome do artefato identifica o evento e o número da PR/execução; retenção configurada em 14 dias.
+- O nome do artefato identifica o evento e o número da PR/execução; inclui `build-info.txt` com proveniência e retenção de 14 dias.
 - A publicação não faz merge, não cria GitHub Release e não altera a branch main.
 
 ## Unreleased — Controle de versão do aplicativo
