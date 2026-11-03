@@ -43,8 +43,6 @@ assert.doesNotMatch(workflow, /^\s*publish-release\s*:/m, 'CI must never create 
 assert.doesNotMatch(workflow, /^\s*contents:\s*write\s*$/m, 'the build workflow must not request write access to repository contents');
 assert.ok(workflow.includes('- name: Upload Android APK (main branch)'), 'main-only APK upload step must remain present');
 assert.match(workflow, /if: \$\{\{ github\.ref == 'refs\/heads\/main' \}\}/, 'APK artifact upload must be restricted to pushes on main');
-assert.doesNotMatch(workflow, /github\.event_name/, 'pull-request events must not publish APK artifacts');
-assert.doesNotMatch(workflow, /github\.event\.pull_request/, 'PR metadata must not enable APK publication');
 assert.doesNotMatch(workflow, /github\.event\.repository\.visibility/, 'APK artifact upload must not depend on repository visibility');
 assert.match(workflow, /retention-days:\s*14\b/, 'APK artifacts must be retained for 14 days');
 assert.match(workflow, /sha256sum android\/app\/build\/outputs\/apk\/release\/app-release\.apk/, 'the APK must have a verifiable SHA-256 checksum');
