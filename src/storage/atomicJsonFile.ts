@@ -114,6 +114,22 @@ export async function writeJsonAtomically<T>(
         const main = await readCandidate(path, validate, isFutureVersion);
         if (main.kind === 'FUTURE') throw new Error('JSON_SCHEMA_VERSION_NEWER_THAN_APP: ' + path);
         if (main.kind === 'VALID') {
+          // Existing previous snapshots are protected data too: never replace a
+          // corrupt or future-schema JSON backup while the main file is valid.
+          const existingBackup = await readCandidate(backup, validate, isFutureVersion);
+          if (existingBackup.kind === 'FUTURE') {
+            throw new Error('JSON_PREVIOUS_SCHEMA_VERSION_NEWER_THAN_APP: ' + path);
+          }
+          if (existingBackup.kind === 'INVALID') {
+            throw new Error('JSON_PREVIOUS_COPY_INVALID: ' + path);
+          }
+          const existingBackupTemp = await readCandidate(backupTemp, validate, isFutureVersion);
+          if (existingBackupTemp.kind === 'FUTURE') {
+            throw new Error('JSON_PREVIOUS_TEMP_SCHEMA_VERSION_NEWER_THAN_APP: ' + path);
+          }
+          if (existingBackupTemp.kind === 'INVALID') {
+            throw new Error('JSON_PREVIOUS_TEMP_COPY_INVALID: ' + path);
+          }
           await FileSystem.deleteAsync(backupTemp, { idempotent: true });
           await FileSystem.copyAsync({ from: path, to: backupTemp });
           const verifiedBackup = await readCandidate(backupTemp, validate, isFutureVersion);
