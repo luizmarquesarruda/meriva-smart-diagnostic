@@ -81,13 +81,13 @@ jobs:
           BUILD_REF: ${{ github.ref }}
         run: |
           {
-            printf 'event=%s\\n' "$BUILD_EVENT"
-            printf 'run_id=%s\\n' "$BUILD_RUN_ID"
-            printf 'run_number=%s\\n' "$BUILD_RUN_NUMBER"
-            printf 'workflow_sha=%s\\n' "$BUILD_SHA"
-            printf 'pull_request_head_sha=%s\\n' "$PR_HEAD_SHA"
-            printf 'pull_request_base_sha=%s\\n' "$PR_BASE_SHA"
-            printf 'ref=%s\\n' "$BUILD_REF"
+            printf 'event=%s\n' "$BUILD_EVENT"
+            printf 'run_id=%s\n' "$BUILD_RUN_ID"
+            printf 'run_number=%s\n' "$BUILD_RUN_NUMBER"
+            printf 'workflow_sha=%s\n' "$BUILD_SHA"
+            printf 'pull_request_head_sha=%s\n' "$PR_HEAD_SHA"
+            printf 'pull_request_base_sha=%s\n' "$PR_BASE_SHA"
+            printf 'ref=%s\n' "$BUILD_REF"
           } > android/app/build/outputs/apk/release/build-info.txt
       - name: Upload Android APK artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -96,5 +96,6 @@ jobs:
           path: |
             android/app/build/outputs/apk/release/app-release.apk
             android/app/build/outputs/apk/release/app-release.apk.sha256
+            android/app/build/outputs/apk/release/build-info.txt
           if-no-files-found: error
           retention-days: 14
