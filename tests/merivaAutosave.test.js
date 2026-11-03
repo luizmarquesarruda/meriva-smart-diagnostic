@@ -285,7 +285,7 @@ test('2. salvar -> modificar -> salvar -> restaura última versão', async () =>
   assert.strictEqual(m.getAutoSaveState().settings.fase, 2);
 });
 
-test('3. arquivo principal corrompido -> restaura previous.json', async () => {
+test('3. principal corrompido permite fallback de leitura, mas bloqueia sobrescrita', async () => {
   const m = manager();
   m.disposeAutoSave();
   resetFS();
@@ -345,7 +345,7 @@ test('4. schema antigo -> migrar', async () => {
   delete migrations.AUTOSAVE_MIGRATIONS[0];
 });
 
-test('5. schema futuro -> não destruir, usar fallback', async () => {
+test('5. principal de schema futuro permite fallback de leitura, mas bloqueia sobrescrita', async () => {
   const m = manager();
   m.disposeAutoSave();
   resetFS();
@@ -365,7 +365,6 @@ test('5. schema futuro -> não destruir, usar fallback', async () => {
     source: 'futuro',
     payload: {},
   });
-  files.set(`${CONFIG_DIR}/autosave.json`, future);
   const mainPath = `${CONFIG_DIR}/autosave.json`;
   const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
   const previousBefore = files.get(previousPath);
