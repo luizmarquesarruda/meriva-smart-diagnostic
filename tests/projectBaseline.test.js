@@ -37,13 +37,16 @@ const diagnosticsExporter = read('src/storage/exportDiagnostics.ts');
 assert.equal(packageJson.scripts['gate:baseline'], 'node tests/projectBaseline.test.js');
 assert.match(workflow, /name: Run anti-regression baseline gate[\s\S]*?run: npm run gate:baseline/);
 assert.match(workflow, /group: ci-\$\{\{ github\.workflow \}\}-\$\{\{ github\.event\.pull_request\.head\.repo\.full_name \|\| github\.repository \}\}-\$\{\{ github\.head_ref \|\| github\.ref_name \}\}/,
-  'push and pull_request for the same branch must share one CI concurrency group');
-// CI security: APKs are not published from public repositories or pull-request builds.
+  'push and pull_request for the same branch share one CI group; the latest run completes and publishes the artifact');
+// CI security and delivery: upload the APK as a workflow artifact, without creating a release or granting repository write access.
 assert.doesNotMatch(workflow, /^\s*publish-release\s*:/m, 'CI must never create public GitHub Releases automatically');
 assert.doesNotMatch(workflow, /^\s*contents:\s*write\s*$/m, 'the build workflow must not request write access to repository contents');
 assert.doesNotMatch(workflow, /github\.event\.repository\.visibility\s*==\s*'private'/, 'APK artifact must also be downloadable from the public project repository');
-assert.match(workflow, /github\.ref == 'refs\/heads\/main'/, 'APK artifact upload must be limited to main, never pull requests or work branches');
-assert.match(workflow, /retention-days:\s*14\b/, 'main APK artifact must remain available for 14 days');
+assert.match(workflow, /name: Upload Android APK artifact[\s\S]*?uses: actions\/upload-artifact@/, 'successful Android builds must upload a workflow artifact');
+assert.match(workflow, /android\/app\/build\/outputs\/apk\/release\/app-release\.apk/, 'artifact must contain the standalone APK');
+assert.match(workflow, /app-release\.apk\.sha256/, 'artifact must contain the APK SHA-256 file');
+assert.match(workflow, /build-info\.txt/, 'artifact must contain build provenance metadata');
+assert.match(workflow, /retention-days:\s*14\b/, 'APK artifact must remain available for 14 days');
 assert.match(workflow, /sha256sum android\/app\/build\/outputs\/apk\/release\/app-release\.apk/, 'the APK must have a verifiable SHA-256 checksum');
 assert.match(workflow, /actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1/);
 assert.match(workflow, /actions\/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1/);
@@ -182,6 +185,16 @@ assert.match(read('src/obd/bluetoothManager.ts'), /PID_DISCOVERY_SUMMARY/);
 assert.match(read('src/obd/parser.ts'), /hasValidKLineChecksum/);
 assert.match(read('src/obd/dtcParser.ts'), /validAdditiveChecksum/);
 assert.match(read('src/storage/driveCycleStorage.ts'), /HISTORICO_DE_VIAGENS_CORROMPIDO/);
+const atomicJsonSource = read('src/storage/atomicJsonFile.ts');
+assert.match(atomicJsonSource, /readJsonWithRecovery/);
+assert.match(atomicJsonSource, /writeJsonAtomically/);
+assert.match(atomicJsonSource, /JSON_PENDING_TEMPORARY/);
+assert.match(read('src/database/appSettings.ts'), /readJsonWithRecovery/);
+assert.match(read('src/database/vehicleConfig.ts'), /writeJsonAtomically/);
+assert.match(read('src/database/learningProfile.ts'), /hasFutureLearningProfileSchema/);
+assert.match(read('src/database/maintenanceStorage.ts'), /hasFutureMaintenanceSchema/);
+assert.match(read('src/meriva/autosaveManager.ts'), /assertAutosaveTemporaryAbsent/);
+assert.match(read('app/saude.tsx'), /getStorageHealthIssues/);
 assert.match(read('src/storage/driveCycleStorage.ts'), /indexWriteQueues/);
 assert.match(read('src/database/csvLogger.ts'), /MAX_PENDING_CSV_ROWS/);
 assert.match(read('app/armazenamento.tsx'), /csvQueueStatus\.droppedRows/);
