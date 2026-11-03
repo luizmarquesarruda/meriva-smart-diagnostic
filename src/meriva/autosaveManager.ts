@@ -15,6 +15,7 @@ import { hydrateState, isValidEnvelope, validatePayload } from './autosaveValida
 import { migrateEnvelope } from './autosaveMigrations';
 import { appendAutoSaveHistory } from './autosaveHistoryTxt';
 import { appendDailyObdSessionEvent } from './dailyObdHistory';
+import { clearStorageHealthIssue, recordStorageHealthIssue } from '../storage/storageHealth';
 
 const DEBOUNCE_MS = 1500;
 const CHECKPOINT_MS = 45000;
@@ -106,6 +107,52 @@ async function readEnvelope(path: string): Promise<AutoSaveEnvelope<MerivaPersis
   }
 }
 
+/**
+ * Um temporário existente pode conter o snapshot mais recente de uma gravação
+ * interrompida. Mesmo JSON válido exige recuperação explícita antes de escrever.
+ */
+async function assertAutosaveTemporaryAbsent(path: string): Promise<void> {
+  const info = await FileSystem.getInfoAsync(path);
+  if (info.exists) {
+    throw new Error('AUTOSAVE_TEMPORARIO_PENDENTE; ARQUIVO PRESERVADO; RECUPERAÇÃO EXPLÍCITA NECESSÁRIA: ' + path);
+  }
+}
+
+async function assertAutosaveFileReplaceable(path: string): Promise<void> {
+  const info = await FileSystem.getInfoAsync(path);
+  if (!info.exists) return;
+  if (info.isDirectory) {
+    throw new Error('AUTOSAVE_JSON_PATH_IS_DIRECTORY; ARQUIVO PRESERVADO; GRAVAÇÃO BLOQUEADA: ' + path);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await FileSystem.readAsStringAsync(path, {
+      encoding: FileSystem.EncodingType.UTF8,
+    }));
+  } catch {
+    throw new Error('AUTOSAVE_JSON_CORROMPIDO; ARQUIVO ORIGINAL PRESERVADO; GRAVAÇÃO BLOQUEADA: ' + path);
+  }
+
+  if (
+    typeof parsed === 'object' &&
+    parsed !== null &&
+    typeof (parsed as { schemaVersion?: unknown }).schemaVersion === 'number' &&
+    Number.isInteger((parsed as { schemaVersion: number }).schemaVersion) &&
+    (parsed as { schemaVersion: number }).schemaVersion > AUTOSAVE_SCHEMA_VERSION
+  ) {
+    throw new Error('AUTOSAVE_SCHEMA_FUTURO; ARQUIVO ORIGINAL PRESERVADO; GRAVAÇÃO BLOQUEADA: ' + path);
+  }
+  if (!isValidEnvelope(parsed)) {
+    throw new Error('AUTOSAVE_JSON_INVALIDO; ARQUIVO ORIGINAL PRESERVADO; GRAVAÇÃO BLOQUEADA: ' + path);
+  }
+
+  const migrated = migrateEnvelope<MerivaPersistedState>(parsed);
+  if (!migrated || !validatePayload(migrated.payload)) {
+    throw new Error('AUTOSAVE_JSON_NÃO_VALIDADO; ARQUIVO ORIGINAL PRESERVADO; GRAVAÇÃO BLOQUEADA: ' + path);
+  }
+}
+
 async function loadLastValidEnvelope(
   basePath: string,
 ): Promise<AutoSaveEnvelope<MerivaPersistedState> | null> {
@@ -145,6 +192,15 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     const content = JSON.stringify(envelope, null, 2);
     const base = runtime.basePath;
 
+    const mainInfoBeforeSave = await FileSystem.getInfoAsync(mainPath(base));
+    const previousInfoBeforeSave = await FileSystem.getInfoAsync(previousPath(base));
+    if (!mainInfoBeforeSave.exists && previousInfoBeforeSave.exists) {
+      throw new Error('AUTOSAVE_PRINCIPAL_AUSENTE_COM_CÓPIA_ANTERIOR; RECUPERAÇÃO EXPLÍCITA NECESSÁRIA');
+    }
+    await assertAutosaveFileReplaceable(mainPath(base));
+    await assertAutosaveFileReplaceable(previousPath(base));
+    await assertAutosaveTemporaryAbsent(tmpPath(base));
+
     await FileSystem.writeAsStringAsync(tmpPath(base), content, {
       encoding: FileSystem.EncodingType.UTF8,
     });
@@ -168,6 +224,7 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     runtime.lastSavedAt = savedAt;
     runtime.lastSaveReason = reason;
     runtime.lastError = null;
+    clearStorageHealthIssue('AUTOSAVE_FAILED', 'CONFIG/autosave.json');
     runtime.lastSavedFingerprint = fingerprintBeforeSave;
 
     try {
@@ -186,6 +243,13 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
   } catch (cause) {
     runtime.dirty = true;
     runtime.lastError = cause instanceof Error ? cause.message : 'ERRO DESCONHECIDO NO AUTOSAVE';
+    recordStorageHealthIssue(
+      'AUTOSAVE_FAILED',
+      'Autosave bloqueado por falha de integridade',
+      runtime.lastError + ' Os arquivos originais foram preservados.',
+      'critical',
+      'CONFIG/autosave.json',
+    );
     console.warn('[autosave] falha ao salvar:', runtime.lastError);
     return false;
   } finally {
