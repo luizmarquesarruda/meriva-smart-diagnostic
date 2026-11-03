@@ -5062,4 +5062,23 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - O upload em PR não mescla código, não cria release e não publica na branch principal.
 - Execução anterior 41698878105: build e checksum passaram no SHA `e64cd43e0290310948d5d34d33fcebdb5a348dd5`, mas nenhum artefato foi publicado devido à condição antiga.
 - A nova publicação só será considerada validada após uma execução de CI da PR produzir o artefato e permitir seu download.
-- Corrigido também o grupo de concorrência da CI para separar eventos `push` e `pull_request`; antes, os dois eventos da mesma branch podiam cancelar um ao outro e impedir a geração do artefato.
+- Revisão da estratégia: `push` e `pull_request` da mesma branch voltam a compartilhar grupo de concorrência para evitar duas compilações Android idênticas. A execução mais recente deve concluir e publicar o artefato; a asserção do baseline foi atualizada.
+- O artefato passa a incluir `build-info.txt` com evento, run ID/número, SHA do workflow, SHA head/base da PR e ref, além do APK e checksum.
+
+
+## DB-197 · 2026-11-03 — Auditoria de módulos e entrega rastreável do APK
+
+### Auditoria estática inicial (branch da PR #120)
+- Inventário percorrido: telas Expo, persistência JSON/TXT/CSV, autosave, backup, quota/limpeza, viagens, DTC, PID/ELM327, Bluetooth Classic, GPS/background, combustível/autonomia, diagnóstico, permissões, catálogo de conhecimento, testes e CI.
+- Risco alto: `VIAGENS/index.json` mantém caminho próprio fora de `atomicJsonFile`; `readDriveCycles` pode retornar lista vazia quando principal e cópia anterior não são válidos, mascarando falha como ausência de viagens. A gravação usa temporário fixo sem bloquear temporário pendente e sem validação de schema futuro.
+- Risco alto: fila de telemetria CSV fica somente em memória até flush, tem teto de 10.000 linhas e descarta novas linhas ao atingir o teto; encerramento abrupto antes do flush pode perder amostras. Escrita existente reescreve arquivo completo, custo O(tamanho do arquivo) por lote.
+- Risco alto: backup verifica tamanhos por diretório, não hashes de conteúdo por arquivo; alteração de conteúdo mantendo tamanho pode passar pela verificação.
+- Risco médio: `cleanupOldLogs` e `cleanupOldReadings` removem arquivos por idade; quota automática limita candidatos a `LOGS` e `LEITURAS`. O TXT diário ECU em `VIAGENS` não é alvo dessas rotinas e não tem política de retenção no código inspecionado.
+- Risco médio: a camada de saúde de armazenamento cobre arquivos JSON protegidos, mas ainda não representa claramente falha de leitura do índice de viagens nem saturação/perda da fila CSV como alertas persistentes.
+- Integridade: parser/fórmulas validam bytes, faixas, origem e frescor em caminhos principais; validação física do ELM327/ECU e precisão dos PIDs no Galaxy A06 seguem não validadas.
+
+### Correção de CI/artefato
+- O baseline falhou no SHA `f08561782564d9846076576d390f2e2a0d747482` porque exigia grupo de concorrência e política de publicação antigos; não foi ignorado. O teste foi corrigido para exigir artefato de workflow e SHA-256 em qualquer build Android aprovado.
+- O grupo de concorrência compartilhado foi mantido para evitar duas compilações por branch; a execução mais recente deve terminar.
+- O pacote do artefato inclui APK standalone, `.sha256` e `build-info.txt` com proveniência.
+- A auditoria é estática e baseada no código/testes da branch; não substitui teste de aparelho nem validação real do adaptador.
