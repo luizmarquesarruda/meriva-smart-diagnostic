@@ -516,6 +516,34 @@ test('5e. caminho principal convertido em diretório bloqueia gravação', async
   m.disposeAutoSave();
 });
 
+test('5f. temporário JSON válido pendente bloqueia sobrescrita para preservar recuperação', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  m.updateAutoSaveState((s) => { s.settings.fase = 'principal-valido'; });
+  await m.saveNow('critical');
+  m.updateAutoSaveState((s) => { s.settings.fase = 'segunda-versao'; });
+  await m.saveNow('critical');
+
+  const mainPath = `${CONFIG_DIR}/autosave.json`;
+  const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
+  const temporaryPath = `${CONFIG_DIR}/autosave.json.tmp`;
+  const mainBefore = files.get(mainPath);
+  const previousBefore = files.get(previousPath);
+  const recoverableTemporary = files.get(mainPath);
+  assert.ok(recoverableTemporary, 'fixture deve conter envelope válido');
+  files.set(temporaryPath, recoverableTemporary);
+
+  m.updateAutoSaveState((s) => { s.settings.novaAlteracao = true; });
+  assert.strictEqual(await m.saveNow('critical'), false,
+    'um temporário válido pode conter a última gravação recuperável e deve bloquear sobrescrita');
+  assert.strictEqual(files.get(mainPath), mainBefore, 'principal deve permanecer intacto');
+  assert.strictEqual(files.get(previousPath), previousBefore, 'cópia anterior deve permanecer intacta');
+  assert.strictEqual(files.get(temporaryPath), recoverableTemporary, 'temporário recuperável deve permanecer byte a byte');
+  m.disposeAutoSave();
+});
+
 test('6. SIMULACAO não contamina learning nem banco de PIDs', async () => {
   const m = manager();
   m.disposeAutoSave();
