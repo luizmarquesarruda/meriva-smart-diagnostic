@@ -3,9 +3,9 @@
 ## Unreleased
 
 ### Persistência — proteção contra sobrescrita do autosave
-- O autosave agora valida o JSON principal e a cópia anterior antes de iniciar uma nova gravação; arquivo corrompido, inválido, diretório inesperado ou schema futuro bloqueia a escrita.
+- O autosave agora valida o JSON principal, a cópia anterior e o temporário antes de iniciar uma nova gravação; arquivo corrompido, inválido, diretório inesperado ou schema futuro bloqueia a escrita.
 - A leitura continua podendo recuperar a última cópia válida, mas não substitui automaticamente o arquivo problemático; principal e backup permanecem intactos até uma recuperação explícita.
-- Adicionados testes para principal corrompido/futuro e cópia anterior corrompida/futura. Histórico diário ECU, Bluetooth, GPS e fórmulas de autonomia não foram alterados.
+- Adicionados testes para principal, cópia anterior e temporário corrompidos ou de schema futuro. Histórico diário ECU, Bluetooth, GPS e fórmulas de autonomia não foram alterados.
 
 
 ### GPS / background location
