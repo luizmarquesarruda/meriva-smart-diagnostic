@@ -104,7 +104,7 @@ assert.match(laboratory, /setPid\(value\)/);
 assert.match(index, /layout\.landscape \? styles\.bottomNavLandscape : styles\.bottomNavPortrait/, 'retrato e paisagem devem selecionar contêineres de navegação próprios');
 assert.match(index, /bottomNavPortrait:\{backgroundColor:'transparent',borderWidth:0,padding:0,gap:6\}/, 'retratro não deve agrupar as abas em uma única superfície');
 assert.match(index, /bottomNavItemPortrait:\{backgroundColor:COLORS\.surface,borderWidth:1,borderColor:COLORS\.border,borderRadius:12,minHeight:60/, 'cada aba no retrato deve ter cartão independente com altura confortável');
-assert.match(index, /bottomNavActivePortrait:\{backgroundColor:'#152a45',borderColor:'#4b82b8'\}/, 'aba selecionada deve ter contorno de destaque em retrato');
+assert.match(index, /bottomNavActivePortrait:\{backgroundColor:'#152a45',borderColor:COLORS\.borderAccent\}/, 'aba selecionada deve ter contorno de destaque em retrato');
 assert.match(index, /bottomNavTextPortrait:\{fontSize:9\.5,lineHeight:12\}/, 'rótulos do retrato devem ser maiores que os rótulos compactos da paisagem');
 assert.equal((index.match(/!layout\.landscape && styles\.bottomNavItemPortrait/g) ?? []).length, 5, 'as cinco abas precisam receber o estilo individual em retrato');
 assert.equal((index.match(/hitSlop=\{4\}/g) ?? []).length, 5, 'as cinco abas devem ampliar a área de toque sem mudar a geometria da paisagem');

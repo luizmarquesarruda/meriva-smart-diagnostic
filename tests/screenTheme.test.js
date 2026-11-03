@@ -10,6 +10,32 @@ assert.match(theme, /screen:\s*'#07111f'/);
 assert.match(theme, /surface:\s*'#0e1b2d'/);
 assert.match(theme, /SCREEN_TITLE_STYLE/);
 
+function relativeLuminance(hex) {
+  const normalized = hex.replace('#', '');
+  const channels = normalized.length === 3
+    ? normalized.split('').map((part) => parseInt(part + part, 16) / 255)
+    : [0, 2, 4].map((index) => parseInt(normalized.slice(index, index + 2), 16) / 255);
+  const linear = channels.map((channel) => channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4));
+  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+}
+function contrastRatio(foreground, background) {
+  const first = relativeLuminance(foreground);
+  const second = relativeLuminance(background);
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+function getColorToken(name) {
+  const line = theme.split('\n').find((entry) => entry.trimStart().startsWith(name + ':'));
+  assert.ok(line, 'token de cor ausente: ' + name);
+  const match = line.match(/'(#[0-9a-fA-F]{3,8})'/);
+  assert.ok(match, 'valor hexadecimal ausente para token: ' + name);
+  return match[1];
+}
+const sharedBorder = getColorToken('border');
+assert.ok(contrastRatio(sharedBorder, getColorToken('screen')) >= 3, 'borda deve ter contraste >= 3:1 no fundo principal');
+assert.ok(contrastRatio(sharedBorder, getColorToken('surface')) >= 3, 'borda deve ter contraste >= 3:1 na superfície');
+assert.ok(contrastRatio(sharedBorder, getColorToken('surfaceRaised')) >= 3, 'borda deve ter contraste >= 3:1 na superfície elevada');
+assert.ok(contrastRatio(getColorToken('textSubtle'), getColorToken('screen')) >= 4.5, 'texto auxiliar deve ter contraste >= 4,5:1');
+
 const screens = [
   'app/index.tsx', 'app/dados.tsx', 'app/saude.tsx', 'app/mais.tsx',
   'app/veiculo.tsx', 'app/viagens.tsx', 'app/aprendizado.tsx',
@@ -23,6 +49,7 @@ const sharedPaletteLiterals = [
 ];
 for (const file of screens) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
+  assert.doesNotMatch(source, /border(?:Top|Bottom|Left|Right)?Color\s*:\s*['"]#[0-9a-fA-F]{3,8}['"]/i, file + ' deve usar tokens de borda do tema');
   assert.match(source, /from ['"]\.\.\/src\/ui\/theme['"]/, file + ' deve importar o tema comum');
   assert.match(source, /COLORS\.screen/, file + ' deve usar o fundo comum da tela');
   for (const literal of sharedPaletteLiterals) {
