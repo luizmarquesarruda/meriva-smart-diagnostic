@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Impedir que o autosave substitua um JSON principal ou uma cópia anterior corrompida, inválida ou criada por schema futuro.
+**Goal:** Impedir que o autosave substitua um JSON principal ou uma cópia anterior corrompida, inválida ou criada por schema futuro, e impedir que um temporário pendente seja descartado.
 
-**Architecture:** Manter a leitura tolerante para recuperar o último envelope válido, mas exigir que todos os arquivos de destino que podem ser substituídos sejam inspecionados e validados antes de iniciar a gravação. A persistência falha de forma fechada, mantendo intactos o principal e a cópia anterior.
+**Architecture:** Manter a leitura tolerante para recuperar o último envelope válido, mas exigir que todos os arquivos de destino que podem ser substituídos sejam inspecionados e validados antes de iniciar a gravação. A persistência falha de forma fechada, mantendo intactos o principal, a cópia anterior e qualquer temporário recuperável.
 
 **Tech Stack:** React Native, Expo SDK 51, TypeScript, Node.js tests, Expo FileSystem mock.
 
@@ -25,7 +25,7 @@
 - Principal com schema futuro e cópia anterior válida: bloquear gravação sem degradar o arquivo futuro.
 - Principal válido com cópia anterior corrompida: bloquear gravação para não substituir a única cópia anterior preservada.
 - Principal válido com cópia anterior em schema futuro: bloquear gravação e preservar ambos.
-- Temporário existente corrompido ou de schema futuro: bloquear a gravação antes de sobrescrevê-lo.
+- Qualquer temporário preexistente, mesmo que JSON válido, pode ser a cópia mais recente de uma gravação interrompida; bloquear e preservar até recuperação explícita.
 - JSON estruturalmente inválido ou diretório no caminho do arquivo: falhar de forma fechada.
 
 ---
@@ -38,7 +38,7 @@
 
 **Interfaces:**
 - Consome: `isValidEnvelope`, `migrateEnvelope`, `validatePayload`, Expo FileSystem.
-- Produz: `assertAutosaveFileReplaceable(path)`, usado antes de escrever qualquer arquivo temporário ou substituir o principal/anterior.
+- Produz: `assertAutosaveFileReplaceable(path)` para principal/cópia anterior e `assertAutosaveTemporaryAbsent(path)` para impedir sobrescrita de temporário pendente.
 
 **Steps:**
 - [ ] Adicionar testes para principal corrompido/schema futuro e cópia anterior/temporário corrompidos ou de schema futuro.
