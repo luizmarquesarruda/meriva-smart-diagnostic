@@ -5053,3 +5053,12 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 ### Integração
 - PRs #110/#114 foram usadas como referência de implementação, mas suas branches antigas/conflictantes não foram mescladas.
 - Esta fase será entregue em PR própria contra `main`; nenhuma mesclagem automática foi autorizada.
+
+## ARTEFATO APK EM PULL REQUEST — 2026-11-03
+
+- Causa encontrada: o job Android compilava e verificava o APK, mas o passo de upload usava condição exclusiva para `refs/heads/main`; por isso execuções de PR terminavam sem artefato.
+- Corrigida a condição para publicar em `pull_request` e em `main`, mantendo o APK standalone e o arquivo SHA-256 no mesmo artefato.
+- Nome do artefato passa a identificar evento e número da PR/execução; retenção de 14 dias.
+- O upload em PR não mescla código, não cria release e não publica na branch principal.
+- Execução anterior 41698878105: build e checksum passaram no SHA `e64cd43e0290310948d5d34d33fcebdb5a348dd5`, mas nenhum artefato foi publicado devido à condição antiga.
+- A nova publicação só será considerada validada após uma execução de CI da PR produzir o artefato e permitir seu download.
