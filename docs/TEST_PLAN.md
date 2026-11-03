@@ -257,7 +257,7 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 - `android.versionCode` deve ser inteiro e igual a MAJOR×10000 + MINOR×100 + PATCH; MINOR e PATCH ficam entre 0 e 99.
 - `npm run version:check` reprova qualquer divergência; a CI o executa antes de TypeScript, testes e build.
 - Usar `npm run version:patch`, `npm run version:minor` ou `npm run version:major` para atualizar os três arquivos de metadados.
-- Não criar tag, GitHub Release ou publicar APK automaticamente. O APK continua sendo artefato somente do push para `main`.
+- Não criar tag nem GitHub Release automática. O APK é publicado como artefato de workflow após build Android aprovado, inclusive em PR.
 - Alterar a versão não comprova instalação nem funcionamento no Galaxy A06/ELM327; validação física permanece separada.
 
 
@@ -275,6 +275,6 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 - Em qualquer execução com job Android concluído com sucesso (push de branch, `pull_request`, `main` ou execução manual), exigir upload do APK standalone e do arquivo `.sha256` como um único artefato.
 - Em push para `main`, manter a publicação do mesmo conjunto de arquivos.
 - O nome do artefato deve identificar evento e número da PR/execução; retenção esperada: 14 dias.
-- Confirmar que execução de PR disponibiliza artefato na página Actions e que o ZIP baixado contém `app-release.apk` e `app-release.apk.sha256`; verificar checksum após extração.
+- Confirmar que execução de PR disponibiliza artefato na página Actions e que o ZIP baixado contém `app-release.apk`, `app-release.apk.sha256` e `build-info.txt`; verificar checksum após extração e conferir SHA de origem.
 - Upload em PR não pode executar merge, criar GitHub Release nem modificar `main`.
-- Verificar que execuções `push` e `pull_request` da mesma branch não se cancelam mutuamente; o grupo de concorrência deve incluir o tipo do evento.
+- Verificar que `push` e `pull_request` da mesma branch compartilham grupo de concorrência: uma execução anterior pode ser cancelada, mas a mais recente precisa completar e publicar o artefato.
