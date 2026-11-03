@@ -361,8 +361,8 @@ for (let index = 0; index < diaryEntryIds.length; index++) {
   );
 }
 assert.deepEqual(diaryIndexIds, diaryEntryIds, 'o índice DB-NNN precisa corresponder exatamente às entradas do diário');
-const diaryEntryTitles = [...diary.matchAll(/^#{1,4}\\s+DB-\\d{3}\\b\\s*[·—-]\\s*(.*)$/gm)].map((match) => match[1].trim());
-const diaryIndexTitles = [...diary.matchAll(/^- \\*\\*(DB-\\d{3})\\*\\*\\s*[·—-]\\s*(.*)$/gm)].map((match) => match[2].trim());
+const diaryEntryTitles = [...diary.matchAll(/^#{1,4}\s+DB-\d{3}\b\s*[·—-]\s*(.*)$/gm)].map((match) => match[1].trim());
+const diaryIndexTitles = [...diary.matchAll(/^- \*\*(DB-\d{3})\*\*\s*[·—-]\s*(.*)$/gm)].map((match) => match[2].trim());
 assert.deepEqual(diaryIndexTitles, diaryEntryTitles, 'os títulos do índice DB-NNN precisam corresponder exatamente aos títulos das entradas');
 
 console.log('Anti-regression baseline gate: PASS');
