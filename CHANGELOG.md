@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Controle de versão do aplicativo
+- Definido SemVer estável MAJOR.MINOR.PATCH, sincronizado entre package.json, package-lock.json e app.json.
+- Adicionado android.versionCode derivado de MAJOR×10000 + MINOR×100 + PATCH; MINOR/PATCH limitados a 0–99 para garantir crescimento monotônico.
+- Adicionados comandos version:check, version:patch, version:minor e version:major; a CI reprova divergências antes da validação do app.
+- A versão atual permanece 1.0.1; esta alteração não cria um novo release.
+
+
 ## Unreleased
 
 ### GPS / background location

@@ -36,6 +36,8 @@ jobs:
           javac -version
           test -n "$JAVA_HOME"
       - run: npm ci --no-audit --no-fund
+      - name: Validate release version metadata
+        run: npm run version:check
       - run: npm run doctor
       - name: Run anti-regression baseline gate
         run: npm run gate:baseline
