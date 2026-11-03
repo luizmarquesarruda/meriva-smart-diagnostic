@@ -52,11 +52,11 @@ Esses IDs não têm o mesmo significado entre branches. A colisão é real, não
 
 ## Inventário completo das Pull Requests
 
-O GitHub retornou **108 PRs**:
+O inventário inicial retornou 108 PRs; esta auditoria abriu a PR #112 para versionar os resultados. O total atual passou a **109 PRs**:
 
 - **33 merged:** #2, #3, #4, #5, #9, #13, #19, #24, #26, #31, #35, #36, #37, #49, #50, #51, #52, #58, #76, #77, #78, #79, #80, #84, #89, #96, #98, #100, #101, #104, #105, #106 e #108.
 - **71 closed sem merge:** #1, #6, #7, #8, #10, #11, #12, #14, #15, #16, #17, #18, #20, #21, #22, #25, #27, #28, #29, #30, #32, #33, #34, #38, #39, #40, #41, #42, #43, #44, #45, #46, #47, #48, #53, #54, #55, #56, #59, #60, #61, #62, #63, #64, #65, #66, #67, #68, #69, #70, #71, #72, #73, #74, #75, #81, #82, #83, #85, #86, #87, #90, #91, #92, #93, #94, #95, #97, #99, #102 e #103.
-- **4 abertas:** #107, #109, #110 e #111.
+- **5 abertas:** #107, #109, #110, #111 e #112.
 - Os números #23, #57 e #88 não apareceram na listagem de PRs retornada pelo GitHub; não foram inferidos como PRs existentes.
 
 ### PR #107 — documentação GPS
@@ -92,6 +92,14 @@ O GitHub retornou **108 PRs**:
 - CI #4702 falhou no Android build: Metro não encontrou dimensões válidas em `assets/meriva-smart-vehicle-banner.jpg`.
 - O JPEG inválido foi substituído por banner JPEG 480×270 válido no commit acima. No run #4704, `validate` passou; `android-build` ainda estava em andamento na última consulta.
 - A alteração de workflow para artefato em PR/branch continua não integrada até a PR ser mesclada e validada.
+
+
+### PR #112 — auditoria transversal e documentação GPS
+
+- Branch `docs/audit-db-pr-integrity-20261103`, HEAD `f11591d29b27a3ebec35be1a8779de39c448bd22`, base na main atual.
+- Consolida o relatório desta auditoria, correção dos dez títulos divergentes do Diário, asserção de igualdade de títulos no baseline e as correções de GPS/documentação que já estavam propostas na #107.
+- A #107 permanece aberta como proposta original; não integrar ambas para evitar aplicar o mesmo diff documental duas vezes.
+- CI do HEAD mais recente precisa concluir antes de aceitar esta PR.
 
 ## Correções aplicadas nesta rodada
 
