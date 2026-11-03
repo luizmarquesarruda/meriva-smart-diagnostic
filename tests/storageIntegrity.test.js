@@ -472,6 +472,35 @@ async function main() {
   assert.equal(files.get(backupBase + '/LOGS/historico.csv'), 'LOGS ATUAIS ANTES DA FALHA',
     'falha em um diretório deve restaurar LOGS do snapshot de segurança');
 
+
+  // Two backup snapshots created in the same millisecond must never share a directory.
+  const collisionBase = '/doc/BACKUP_COLLISION_TEST';
+  ensureDirectory(collisionBase + '/BANCO');
+  files.set(collisionBase + '/BANCO/state.json', 'snapshot-one');
+  const RealDate = Date;
+  const fixedTime = RealDate.parse('2026-11-03T12:00:00.000Z');
+  global.Date = class extends RealDate {
+    constructor(...args) {
+      if (args.length) super(...args);
+      else super(fixedTime);
+    }
+    static now() { return fixedTime; }
+  };
+  let firstCollisionBackup;
+  let secondCollisionBackup;
+  try {
+    firstCollisionBackup = await backup.createBackup(collisionBase);
+    files.set(collisionBase + '/BANCO/state.json', 'snapshot-two');
+    secondCollisionBackup = await backup.createBackup(collisionBase);
+  } finally {
+    global.Date = RealDate;
+  }
+  assert.notEqual(firstCollisionBackup.timestamp, secondCollisionBackup.timestamp,
+    'backups criados no mesmo milissegundo devem receber nomes exclusivos');
+  const collisionBackups = await backup.listVerifiedBackups(collisionBase);
+  assert.equal(collisionBackups.length, 2,
+    'a segunda criação não pode mesclar/sobrescrever o snapshot anterior');
+
   Module._load = originalLoad;
   console.log('storageIntegrity.test.js: PASS');
 }
