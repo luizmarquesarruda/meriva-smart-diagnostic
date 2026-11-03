@@ -9,8 +9,8 @@
 - Validação PR #105: `validate` e `android-build` passaram no SHA `ff131e9b23ad745955dfe59904025a47cafabc98`.
 - Validação PR #104: `validate` e `android-build` passaram no SHA `2cdbda3807a50e68cd1fe24fe3ff207dc125dbfd`.
 - A CI também passou no push da `main` após a integração da PR #105, SHA `b128b413427e612e621dc2ef2c82b6c2476ce659`. O push de main após o merge da #104 está em execução e deve ser consultado no SHA final correspondente.
-- O repositório permanece público. PR #108 foi integrada por squash em `24651428eb4dff69ad3086627e739df07c1de4dd`: o upload do APK passou a ocorrer apenas em push para `main`, com retenção de 14 dias; não cria GitHub Release nem publica em branches/PRs.
-- O índice e os títulos do Diário estão alinhados até DB-197; DB-195 registra a divergência visual do APK instalado, DB-196 a auditoria da paleta e DB-197 a adaptação do cockpit à referência visual.
+- O repositório permanece público. A política restritiva introduzida na PR #108 foi revertida na PR #111: o APK standalone e o checksum devem ser enviados como Actions Artifact em toda execução bem-sucedida de `android-build` (PR, branch e `main`), com retenção de 14 dias; sem GitHub Release automático.
+- O índice e os títulos do Diário estão alinhados até DB-198; DB-195 registra a divergência visual do APK instalado, DB-196 a auditoria da paleta, DB-197 a adaptação do cockpit e DB-198 a correção do gate de publicação do artefato.
 - Não declarar inspeção visual ou teste físico no Galaxy A06 / SM-A065M / Android 16. Permanecem necessários screenshots em retrato/paisagem e teste ELM327/ECU real, incluindo respostas 010C/012F.
 - A execução CI da PR #108 (run `41205305161`, HEAD `83f702bd7d5247e53f5291f7806477ecdcf3e981`) aprovou `validate` e `android-build`; o upload foi corretamente ignorado por ser evento de PR. O push subsequente na `main` precisa concluir e publicar o artefato do SHA atual antes de enviar novo link de APK.
 
@@ -5056,3 +5056,21 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Sem alteração no transporte Bluetooth Classic, inicialização ELM327, gate da ECU, comandos OBD, polling, fórmulas de consumo/autonomia, GPS, SQLite, histórico ou persistência.
 - O banner é arte ilustrativa e não uma captura do veículo em tempo real. O protocolo só é exibido quando a sessão fornece esse valor.
 - CI, TypeScript, testes, build Android, inspeção visual em retrato/paisagem e teste físico ELM327/ECU ainda precisam ser confirmados no SHA final.
+
+## DB-198 · 2026-11-02 — Corrigir gate anti-regressão do artefato APK em PRs
+
+### Causa raiz
+- A execução CI `41561487152` falhou no job `validate`, etapa `Run anti-regression baseline gate`, antes de TypeScript, testes e build Android.
+- `tests/projectBaseline.test.js` ainda exigia que o upload do APK fosse limitado a `refs/heads/main`, embora a configuração atual da CI já tivesse removido essa condição para disponibilizar o artefato em branches e Pull Requests.
+- A falha era uma contradição entre a política de distribuição aprovada e o teste de baseline; não era falha do Gradle, Expo Doctor ou do código de layout.
+
+### Correção aplicada
+- Atualizado o gate para exigir a presença da etapa `Upload Android standalone APK`, sem condição `if` que restrinja o upload a uma branch/evento.
+- O gate confirma o nome estável `meriva-smart-diagnostic-standalone-apk` e retenção de 14 dias.
+- Mantidos checksum SHA-256, falha explícita quando o APK não existir e ausência de GitHub Release automático.
+- Nenhuma alteração em Bluetooth, ELM327, ECU, PIDs, GPS, autonomia, telemetria, SQLite, histórico ou persistência.
+
+### Validação
+- A execução que identificou a regressão passou no Expo Doctor (17/17), mas falhou no baseline. TypeScript/testes e build Android foram ignorados por dependência.
+- A nova CI deve concluir baseline, TypeScript, testes e build Android no SHA atualizado. Até essa conclusão, APK do SHA corrigido: **não validado**.
+- Teste físico no Galaxy A06 / SM-A065M / Android 16 permanece **não validado**.
