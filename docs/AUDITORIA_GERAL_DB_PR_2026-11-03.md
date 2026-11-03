@@ -21,7 +21,7 @@ A classificação cobre as 108 PRs existentes no GitHub. Isso não equivale a re
 - Run #4682: [resultado no GitHub](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/41384372064).
 - `validate`: sucesso.
 - `android-build`: sucesso.
-- Artefato: `meriva-smart-diagnostic-standalone-apk`, 29.771.179 bytes, disponível no run #4682; expiração indicada pelo GitHub: 2026-11-16.
+- Artefato: `meriva-smart-diagnostic-standalone-apk`, 29.771.179 bytes, ID `13115116365`, digest SHA-256 `237b9c3bb52cfa0b12afc5f5e73912b7bc864fc93f192974283247c131ea0b04`, disponível no run #4682 até 2026-11-16.
 - O repositório está público. A política integrada pela PR #108 ainda limita o upload do APK a push em `main`; a ampliação para PRs/branches está somente na PR #111.
 
 ## Auditoria de DB
@@ -68,38 +68,38 @@ O inventário inicial retornou 108 PRs; esta auditoria abriu a PR #112 para vers
 
 ### PR #109 — armazenamento, histórico e telemetria
 
-- Branch `fix/storage-and-history-integrity-20261031`, HEAD auditado após as correções: `41912b2dc899d2b81dc111999a494eaa5e4af9f9`.
+- Branch `fix/storage-and-history-integrity-20261031`, HEAD atual consultado: `0b29c908a5754ffd9ab31d66e73590bc62d63381`.
 - 48 arquivos alterados e 121 commits no metadado consultado.
 - **Conflito de integração:** `mergeable=false`; base anterior à main atual.
 - Revisão P1 identificou que `buildDriveCycle()` era chamado novamente em cada retry, gerando novo ID pelo horário de finalização. Corrigido com cache do ciclo associado à identidade do gravador; teste verifica que o mesmo objeto/ID é reutilizado e que outro gravador recebe ID novo.
 - Revisão P1 sobre spool CSV: o caminho atual usa arquivo temporário, read-back, validação e move para nome canônico apenas após validação. Foi acrescentado teste com falha simulada no read-back, ausência de temporário/segmento parcial e retry que grava exatamente uma linha.
 - O workflow não precisava de um job `baseline-gate` separado: o baseline já é um passo do job `validate`; o contrato existente foi preservado.
-- CI #4712 foi disparada para o HEAD corrigido e estava em execução na última consulta.
+- As duas discussões P1 da revisão foram resolvidas após conferência do código e dos testes. A consulta de workflows não retornou execução associada ao HEAD atual `0b29c90`; CI desse SHA permanece pendente de confirmação.
 
 ### PR #110 — integridade JSON, backup e benchmark
 
-- Branch `improve/phase1-storage-integrity-20261101`, HEAD `1b063df25bd84bf31d88a0d8424cee3f0bca59dd`.
+- Branch `improve/phase1-storage-integrity-20261101`, HEAD atual consultado: `06e0e0f377d3877df91a95cfc568ca8afeee36c8`.
 - 22 arquivos alterados e 62 commits.
 - **Conflito de integração:** `mergeable=false`; mesma base antiga da #109.
 - Revisados `atomicJsonFile.ts`, migrações de índice, armazenamento de viagens, backup e testes. Os testes verificam bloqueio de escrita sobre JSON corrompido/schema futuro, preservação da cópia anterior válida e rollback.
 - O manifesto do backup compara tamanho por diretório e total, não hashes por arquivo. Isso verifica tamanho, mas não garante integridade byte a byte se uma alteração/corrupção preservar o comprimento. Risco residual P2; não foi introduzida dependência criptográfica nova nesta rodada.
-- CI #4609 passou em HEAD antigo, mas não valida a resolução dos conflitos com a main atual.
+- CI #4609 passou no HEAD antigo `1b063df`; não foi localizada execução associada ao HEAD atual `06e0e0f`. O risco P2 permanece: o manifesto confere tamanhos, mas não hashes individuais por arquivo.
 
 ### PR #111 — layout, paleta e artefato APK
 
 - Branch `fix/layout-palette-contrast-20261102`, HEAD corrigido `a040221cd438aefc7d063171e6557360a06a2355`.
 - 23 arquivos alterados e 13 commits; base é a main atual e o GitHub marcou mergeável.
 - CI #4702 falhou no Android build: Metro não encontrou dimensões válidas em `assets/meriva-smart-vehicle-banner.jpg`.
-- O JPEG inválido foi substituído por banner JPEG 480×270 válido no commit acima. No run #4704, `validate` passou; `android-build` ainda estava em andamento na última consulta.
-- A alteração de workflow para artefato em PR/branch continua não integrada até a PR ser mesclada e validada.
+- O JPEG inválido foi substituído por banner JPEG 480×270 válido no commit acima. No run #4704, `validate` e `android-build` concluíram com sucesso. Artefato `meriva-smart-diagnostic-standalone-apk`, ID `13209251978`, 29.786.656 bytes, digest SHA-256 `204e657ecbd6dde9eda2b54c88ddde2c49d9dd34c01677f0bc234b79c4a3bfe8`, disponível até 2026-11-17.
+- A alteração de workflow está ativa na branch da #111 e gerou o artefato acima; ainda não está integrada à `main`.
 
 
 ### PR #112 — auditoria transversal e documentação GPS
 
-- Branch `docs/audit-db-pr-integrity-20261103`, HEAD `f11591d29b27a3ebec35be1a8779de39c448bd22`, base na main atual.
+- Branch `docs/audit-db-pr-integrity-20261103`, HEAD consultado antes desta atualização: `35ed58492d0ce9686db181253f7458701ce9da2f`, base na main atual.
 - Consolida o relatório desta auditoria, correção dos dez títulos divergentes do Diário, asserção de igualdade de títulos no baseline e as correções de GPS/documentação que já estavam propostas na #107.
 - A #107 permanece aberta como proposta original; não integrar ambas para evitar aplicar o mesmo diff documental duas vezes.
-- CI do HEAD mais recente precisa concluir antes de aceitar esta PR.
+- CI #4726 do HEAD `35ed584` concluiu com `validate` e `android-build` verdes. O upload do APK foi ignorado por não ser push em `main`; não houve artefato nesta execução.
 
 ## Correções aplicadas nesta rodada
 
