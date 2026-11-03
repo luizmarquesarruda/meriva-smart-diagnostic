@@ -68,38 +68,37 @@ O inventário inicial retornou 108 PRs; esta auditoria abriu a PR #112 para vers
 
 ### PR #109 — armazenamento, histórico e telemetria
 
-- Branch `fix/storage-and-history-integrity-20261031`, HEAD atual consultado: `0b29c908a5754ffd9ab31d66e73590bc62d63381`.
+- Branch `fix/storage-and-history-integrity-20261031`, HEAD atual consultado: `ce818544e3872fa2cad8147dfa9397eb1a36cc2c`.
 - 48 arquivos alterados e 121 commits no metadado consultado.
 - **Conflito de integração:** `mergeable=false`; base anterior à main atual.
 - Revisão P1 identificou que `buildDriveCycle()` era chamado novamente em cada retry, gerando novo ID pelo horário de finalização. Corrigido com cache do ciclo associado à identidade do gravador; teste verifica que o mesmo objeto/ID é reutilizado e que outro gravador recebe ID novo.
 - Revisão P1 sobre spool CSV: o caminho atual usa arquivo temporário, read-back, validação e move para nome canônico apenas após validação. Foi acrescentado teste com falha simulada no read-back, ausência de temporário/segmento parcial e retry que grava exatamente uma linha.
 - O workflow não precisava de um job `baseline-gate` separado: o baseline já é um passo do job `validate`; o contrato existente foi preservado.
-- As duas discussões P1 da revisão foram resolvidas após conferência do código e dos testes. A consulta de workflows não retornou execução associada ao HEAD atual `0b29c90`; CI desse SHA permanece pendente de confirmação.
+- As duas discussões P1 da revisão foram resolvidas após conferência do código e dos testes. Foi acrescentada proteção para bloquear gravação quando `.previous.json` ou sua cópia temporária está corrompida ou em schema futuro; testes verificam que main e backup permanecem intactos. A consulta de workflows não retornou execução associada ao HEAD atual `ce81854`; CI desse SHA permanece pendente de confirmação.
 
 ### PR #110 — integridade JSON, backup e benchmark
 
-- Branch `improve/phase1-storage-integrity-20261101`, HEAD atual consultado: `06e0e0f377d3877df91a95cfc568ca8afeee36c8`.
+- Branch `improve/phase1-storage-integrity-20261101`, HEAD atual consultado: `f5e75296015522b25febd0c623e8795d390e6c91`.
 - 22 arquivos alterados e 62 commits.
 - **Conflito de integração:** `mergeable=false`; mesma base antiga da #109.
 - Revisados `atomicJsonFile.ts`, migrações de índice, armazenamento de viagens, backup e testes. Os testes verificam bloqueio de escrita sobre JSON corrompido/schema futuro, preservação da cópia anterior válida e rollback.
-- O manifesto do backup compara tamanho por diretório e total, não hashes por arquivo. Isso verifica tamanho, mas não garante integridade byte a byte se uma alteração/corrupção preservar o comprimento. Risco residual P2; não foi introduzida dependência criptográfica nova nesta rodada.
-- CI #4609 passou no HEAD antigo `1b063df`; não foi localizada execução associada ao HEAD atual `06e0e0f`. O risco P2 permanece: o manifesto confere tamanhos, mas não hashes individuais por arquivo.
+- Correção implementada no HEAD atual: novos manifestos schema 2 registram SHA-256 por arquivo e validam caminho, quantidade, tamanho e hash na listagem, staging, restauração e rollback. Manifestos schema 1 continuam aceitos para backups legados. Foi acrescentado teste que altera conteúdo sem alterar tamanho e exige bloqueio da restauração. CI #4609 pertence ao HEAD antigo `1b063df`; não foi localizada execução associada ao HEAD `f5e7529`, portanto a correção permanece **não validada por CI**.
 
 ### PR #111 — layout, paleta e artefato APK
 
-- Branch `fix/layout-palette-contrast-20261102`, HEAD corrigido `a040221cd438aefc7d063171e6557360a06a2355`.
+- Branch `fix/layout-palette-contrast-20261102`, HEAD atual `4101342a27c3543afedd79637ba6d2276dab977c`.
 - 23 arquivos alterados e 13 commits; base é a main atual e o GitHub marcou mergeável.
 - CI #4702 falhou no Android build: Metro não encontrou dimensões válidas em `assets/meriva-smart-vehicle-banner.jpg`.
-- O JPEG inválido foi substituído por banner JPEG 480×270 válido no commit acima. No run #4704, `validate` e `android-build` concluíram com sucesso. Artefato `meriva-smart-diagnostic-standalone-apk`, ID `13209251978`, 29.786.656 bytes, digest SHA-256 `204e657ecbd6dde9eda2b54c88ddde2c49d9dd34c01677f0bc234b79c4a3bfe8`, disponível até 2026-11-17.
+- O JPEG inválido foi substituído por banner JPEG 480×270 válido no commit acima. No run #4734 (HEAD `4101342`), `validate` e `android-build` concluíram com sucesso. Artefato `meriva-smart-diagnostic-standalone-apk`, ID `13210041138`, 29.786.659 bytes, digest do ZIP SHA-256 `b49c31f9c6a161f238db3cb3b5497b958cfdac7353b29d3fdcea2e3d374ba78a`, disponível até 2026-11-17.
 - A alteração de workflow está ativa na branch da #111 e gerou o artefato acima; ainda não está integrada à `main`.
 
 
 ### PR #112 — auditoria transversal e documentação GPS
 
-- Branch `docs/audit-db-pr-integrity-20261103`, HEAD consultado antes desta atualização: `35ed58492d0ce9686db181253f7458701ce9da2f`, base na main atual.
+- Branch `docs/audit-db-pr-integrity-20261103`, HEAD atual antes desta atualização: `70497787551521caf23696d7e137eff2111b1699`, base na main atual.
 - Consolida o relatório desta auditoria, correção dos dez títulos divergentes do Diário, asserção de igualdade de títulos no baseline e as correções de GPS/documentação que já estavam propostas na #107.
 - A #107 permanece aberta como proposta original; não integrar ambas para evitar aplicar o mesmo diff documental duas vezes.
-- CI #4726 do HEAD `35ed584` concluiu com `validate` e `android-build` verdes. O upload do APK foi ignorado por não ser push em `main`; não houve artefato nesta execução.
+- CI #4743 do HEAD `7049778`: `validate` concluiu com sucesso (doctor, baseline, TypeScript e testes); `android-build` estava em execução na última consulta. Sem artefato ainda.
 
 ## Correções aplicadas nesta rodada
 
@@ -107,14 +106,16 @@ O inventário inicial retornou 108 PRs; esta auditoria abriu a PR #112 para vers
 2. Gate de baseline ampliado para comparar títulos além dos IDs, impedindo retorno da divergência.
 3. PR #109: ID de ciclo de viagem estável entre retries.
 4. PR #109: teste explícito de falha no read-back do spool CSV, limpeza do temporário e retry sem duplicação.
-5. PR #111: substituição do asset JPEG inválido que bloqueava o build Android.
-6. Relatório desta auditoria adicionado ao repositório.
+5. PR #109: bloqueio de sobrescrita de backup JSON corrompido/schema futuro.
+6. PR #110: manifesto schema 2 com SHA-256 por arquivo e teste de corrupção de mesmo tamanho.
+7. PR #111: substituição do asset JPEG inválido; CI #4734 e APK confirmados.
+8. Relatório desta auditoria adicionado ao repositório.
 
 ## Não fazer merge ainda
 
 - #109 e #110 precisam de uma única estratégia de integração para os 19 arquivos em comum; preservar a implementação mais completa sem sobrescrever correções recentes da main.
 - Reconciliar as entradas DB após determinar a ordem de integração; hoje os IDs DB-195/196/198 colidem em conteúdos diferentes.
-- Confirmar CI dos HEADs novos #109 e #111, incluindo `android-build` e artefato no run da #111.
+- Confirmar CI dos HEADs atuais #109 e #110; #111 está verde no HEAD `4101342` com APK publicado; #112 tem `validate` verde e `android-build` em execução no run #4743.
 - PR #107 pode ser revisada separadamente, mas continua sem merge.
 - Inspeção física no Galaxy A06/Android 16 e sessão real ELM327/ECU continuam **não validadas**.
 - SQLite permanece fora do escopo sem medição real no aparelho e aprovação específica.
