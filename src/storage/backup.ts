@@ -284,7 +284,7 @@ async function createBackupSnapshot(
   await FileSystem.makeDirectoryAsync(backupDir, { intermediates: true });
 
   const included: string[] = [];
-  const files: Array<{ directory: string; sizeBytes: number }> = [];
+  const files: BackupDirectoryManifest[] = [];
   let totalSize = 0;
 
   try {
