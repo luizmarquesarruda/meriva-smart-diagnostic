@@ -355,6 +355,13 @@ export async function initializeCarScannerSeed(
   return enqueueProfileTransaction(basePath, async () => {
     const profile = await readLearningProfileUnsafe(basePath);
     if (!profile) return null;
+    const recoveryRequired = getStorageHealthIssues().some((issue) =>
+      issue.id === 'JSON_CORRUPTED:APRENDIZADO/dna_meriva.json' ||
+      issue.id === 'FUTURE_SCHEMA:APRENDIZADO/dna_meriva.json' ||
+      issue.id === 'JSON_RECOVERED:APRENDIZADO/dna_meriva.json',
+    );
+    // Seed tardio não pode transformar recuperação somente de leitura em escrita implícita.
+    if (recoveryRequired) return profile;
     if (profile.seedVersion === CARSCANNER_SEED_VERSION && profile.globalSampleCounts.seedSamples > 0) {
       return profile;
     }

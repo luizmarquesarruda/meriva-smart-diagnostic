@@ -363,6 +363,13 @@ test('5. schema futuro -> não destruir, usar fallback', async () => {
     99,
     'arquivo futuro não pode ser destruído',
   );
+  const storageHealth = loadTs(path.join(ROOT, 'src/storage/storageHealth.ts'));
+  const issueIds = storageHealth.getStorageHealthIssues().map((issue) => issue.id);
+  assert.ok(issueIds.includes('FUTURE_SCHEMA:CONFIG/autosave.json'),
+    'schema futuro deve ser sinalizado na leitura inicial');
+  assert.ok(issueIds.includes('JSON_RECOVERED:CONFIG/autosave.json'),
+    'fallback de autosave deve aparecer como recuperação somente leitura');
+
   const mainBeforeSave = files.get(`${CONFIG_DIR}/autosave.json`);
   const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
   const previousBeforeSave = files.get(previousPath);
@@ -422,6 +429,27 @@ test('5b. temporário pendente bloqueia gravação e permanece intacto', async (
   assert.strictEqual(files.get(previousPath), previousBefore);
   assert.strictEqual(files.get(temporaryPath), pending);
   m.disposeAutoSave();
+});
+
+test('5c. seed não grava por cima de aprendizado recuperado', async () => {
+  resetFS();
+  const learning = loadTs(path.join(ROOT, 'src/database/learningProfile.ts'));
+  const basePath = BASE + '/learning-fallback';
+  const mainPath = basePath + '/APRENDIZADO/dna_meriva.json';
+  const previousPath = basePath + '/APRENDIZADO/dna_meriva.previous.json';
+
+  await learning.createLearningProfile(basePath, '2026-09-24T14:48:00.000Z');
+  await learning.updateLearningProfileRealSample(basePath, 'Engine RPM', 1000, 'IDLE_COLD');
+  const previousBefore = files.get(previousPath);
+  assert.ok(previousBefore, 'segunda gravação deve criar cópia anterior validada');
+  const corruptMain = '{APRENDIZADO PRINCIPAL CORROMPIDO';
+  files.set(mainPath, corruptMain);
+
+  await learning.initializeCarScannerSeed(basePath);
+  assert.strictEqual(files.get(mainPath), corruptMain,
+    'seed não pode substituir o principal corrompido após recuperação');
+  assert.strictEqual(files.get(previousPath), previousBefore,
+    'cópia anterior recuperável precisa permanecer intacta');
 });
 
 test('6. SIMULACAO não contamina learning nem banco de PIDs', async () => {

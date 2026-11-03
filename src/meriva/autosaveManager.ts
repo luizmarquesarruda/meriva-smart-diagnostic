@@ -93,16 +93,53 @@ export async function ensureStorageDirs(basePath: string): Promise<void> {
 }
 
 async function readEnvelope(path: string): Promise<AutoSaveEnvelope<MerivaPersistedState> | null> {
+  const resource = path === previousPath(runtime.basePath)
+    ? 'CONFIG/autosave.previous.json'
+    : 'CONFIG/autosave.json';
+  const reportInvalid = (
+    code: 'JSON_CORRUPTED' | 'FUTURE_SCHEMA',
+    title: string,
+    message: string,
+  ) => {
+    recordStorageHealthIssue(code, title, message + ' O arquivo original foi preservado.', 'critical', resource);
+  };
+
   try {
     const info = await FileSystem.getInfoAsync(path);
     if (!info.exists) return null;
+    if (info.isDirectory) {
+      reportInvalid('JSON_CORRUPTED', 'Caminho do autosave aponta para diretório', path);
+      return null;
+    }
     const content = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
-    const parsed = JSON.parse(content);
-    if (!isValidEnvelope(parsed)) return null;
+    const parsed: unknown = JSON.parse(content);
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      typeof (parsed as { schemaVersion?: unknown }).schemaVersion === 'number' &&
+      (parsed as { schemaVersion: number }).schemaVersion > AUTOSAVE_SCHEMA_VERSION
+    ) {
+      reportInvalid('FUTURE_SCHEMA', 'Schema futuro do autosave', path);
+      return null;
+    }
+    if (!isValidEnvelope(parsed)) {
+      reportInvalid('JSON_CORRUPTED', 'Envelope do autosave inválido', path);
+      return null;
+    }
     const migrated = migrateEnvelope<MerivaPersistedState>(parsed);
-    if (!migrated || !validatePayload(migrated.payload)) return null;
+    if (!migrated || !validatePayload(migrated.payload)) {
+      reportInvalid('JSON_CORRUPTED', 'Payload do autosave inválido', path);
+      return null;
+    }
+    clearStorageHealthIssue('JSON_CORRUPTED', resource);
+    clearStorageHealthIssue('FUTURE_SCHEMA', resource);
     return migrated;
-  } catch {
+  } catch (cause) {
+    reportInvalid(
+      'JSON_CORRUPTED',
+      'Não foi possível validar o autosave',
+      (cause instanceof Error ? cause.message : String(cause)) + ' • ' + path,
+    );
     return null;
   }
 }
@@ -158,7 +195,17 @@ async function loadLastValidEnvelope(
 ): Promise<AutoSaveEnvelope<MerivaPersistedState> | null> {
   const main = await readEnvelope(mainPath(basePath));
   if (main) return main;
-  return readEnvelope(previousPath(basePath));
+  const previous = await readEnvelope(previousPath(basePath));
+  if (previous) {
+    recordStorageHealthIssue(
+      'JSON_RECOVERED',
+      'Autosave recuperado da cópia anterior',
+      'O principal está ausente ou inválido. A cópia validada foi usada somente para leitura; a gravação permanece bloqueada até reparo explícito.',
+      'critical',
+      'CONFIG/autosave.json',
+    );
+  }
+  return previous;
 }
 
 async function persistNow(reason: SaveReason): Promise<boolean> {
