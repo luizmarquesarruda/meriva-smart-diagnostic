@@ -1283,7 +1283,29 @@ async function testTripRecorderRetainedUntilPersistence() {
   assert.ok(serviceSource.includes('persistTripBeforeRelease'), 'trip service must release only after the durable persistence helper completes');
   assert.ok(serviceSource.includes('this.recorderFinalizationPending ? null : this.recorder'), 'a failed previous trip must not absorb telemetry from the next session');
   assert.ok(serviceSource.includes('recorderFinalizationRetryAfterMs'), 'pending trip retries must be throttled without blocking OBD polling');
+  assert.ok(serviceSource.includes('getOrCreatePendingTripCycle'), 'retry must reuse the same finalized cycle and ID');
   const tripFinalization = loadTs(path.join(ROOT, 'src/trip/tripFinalization.ts'));
+  const recorderToken = {};
+  let cycleBuilds = 0;
+  const firstPendingCycle = tripFinalization.getOrCreatePendingTripCycle(
+    null,
+    recorderToken,
+    () => ({ id: 'real_obd_' + (++cycleBuilds) }),
+  );
+  const retryPendingCycle = tripFinalization.getOrCreatePendingTripCycle(
+    firstPendingCycle,
+    recorderToken,
+    () => ({ id: 'real_obd_' + (++cycleBuilds) }),
+  );
+  assert.strictEqual(retryPendingCycle, firstPendingCycle, 'retry must retain the exact cached cycle object');
+  assert.strictEqual(retryPendingCycle.cycle.id, firstPendingCycle.cycle.id, 'retry must retain the exact trip ID');
+  assert.strictEqual(cycleBuilds, 1, 'same recorder must not rebuild finishedAt/ID on retry');
+  const nextRecorderCycle = tripFinalization.getOrCreatePendingTripCycle(
+    retryPendingCycle,
+    {},
+    () => ({ id: 'real_obd_' + (++cycleBuilds) }),
+  );
+  assert.strictEqual(cycleBuilds, 2, 'a new recorder must receive a new finalized cycle');
   let released = false;
   await assert.rejects(() => tripFinalization.persistTripBeforeRelease(
     { id: 'trip-1' },
