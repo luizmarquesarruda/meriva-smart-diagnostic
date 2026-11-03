@@ -36,14 +36,16 @@ const diagnosticsExporter = read('src/storage/exportDiagnostics.ts');
 // Gate itself must be a first-class CI step, not a note in the diary.
 assert.equal(packageJson.scripts['gate:baseline'], 'node tests/projectBaseline.test.js');
 assert.match(workflow, /name: Run anti-regression baseline gate[\s\S]*?run: npm run gate:baseline/);
-assert.match(workflow, /group: ci-\$\{\{ github\.workflow \}\}-\$\{\{ github\.event\.pull_request\.head\.repo\.full_name \|\| github\.repository \}\}-\$\{\{ github\.head_ref \|\| github\.ref_name \}\}/,
-  'push and pull_request for the same branch must share one CI concurrency group');
-// CI security: APKs are not published from public repositories or pull-request builds.
+assert.match(workflow, /group: ci-\$\{\{ github\.workflow \}\}-\$\{\{ github\.event_name \}\}-\$\{\{ github\.event\.pull_request\.head\.repo\.full_name \|\| github\.repository \}\}-\$\{\{ github\.head_ref \|\| github\.ref_name \}\}/,
+  'push and pull_request must have isolated CI concurrency groups so both events can complete');
+// CI security and delivery: upload the APK as a workflow artifact, without creating a release or granting repository write access.
 assert.doesNotMatch(workflow, /^\s*publish-release\s*:/m, 'CI must never create public GitHub Releases automatically');
 assert.doesNotMatch(workflow, /^\s*contents:\s*write\s*$/m, 'the build workflow must not request write access to repository contents');
 assert.doesNotMatch(workflow, /github\.event\.repository\.visibility\s*==\s*'private'/, 'APK artifact must also be downloadable from the public project repository');
-assert.match(workflow, /github\.ref == 'refs\/heads\/main'/, 'APK artifact upload must be limited to main, never pull requests or work branches');
-assert.match(workflow, /retention-days:\s*14\b/, 'main APK artifact must remain available for 14 days');
+assert.match(workflow, /name: Upload Android APK artifact[\s\S]*?uses: actions\/upload-artifact@/, 'successful Android builds must upload a workflow artifact');
+assert.match(workflow, /android\/app\/build\/outputs\/apk\/release\/app-release\.apk/, 'artifact must contain the standalone APK');
+assert.match(workflow, /app-release\.apk\.sha256/, 'artifact must contain the APK SHA-256 file');
+assert.match(workflow, /retention-days:\s*14\b/, 'APK artifact must remain available for 14 days');
 assert.match(workflow, /sha256sum android\/app\/build\/outputs\/apk\/release\/app-release\.apk/, 'the APK must have a verifiable SHA-256 checksum');
 assert.match(workflow, /actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1/);
 assert.match(workflow, /actions\/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1/);
