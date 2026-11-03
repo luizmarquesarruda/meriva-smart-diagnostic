@@ -5173,5 +5173,5 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 
 ### Validação e limites
 - O teste novo foi incorporado à suíte de regressão existente. CI do SHA final e compilação Android precisam confirmar a alteração; resultado ainda **não validado** neste registro.
-- O risco separado de duplicação CSV após falha de read-back foi reavaliado: o spool atual grava em arquivo temporário, lê e valida o conteúdo, move para o nome canônico apenas após a validação e remove o temporário em qualquer exceção. O teste cobre reinício, segmentos canônicos e deduplicação; acrescentar falha simulada explícita de read-back continua recomendado antes de encerrar a auditoria dessa rotina.
+- O caminho de spool foi reavaliado: usa arquivo temporário, read-back, validação de cabeçalho/quantidade/tamanho e só então move para o segmento canônico; falhas removem o temporário, enquanto `spillPendingCsvRows()` devolve o lote não confirmado à fila. `tests/csvSpoolDurability.test.js` agora injeta falha de read-back após escrita, confirma ausência de arquivo parcial e verifica retry com uma única linha.
 - Nenhuma alteração em Bluetooth/ELM/ECU, PID, GPS, autonomia/fórmulas, tanque, SQLite ou histórico diário ECU. SQLite continua condicionado às medições reais aprovadas no Galaxy A06.
