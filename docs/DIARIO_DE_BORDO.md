@@ -5062,3 +5062,4 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - O upload em PR não mescla código, não cria release e não publica na branch principal.
 - Execução anterior 41698878105: build e checksum passaram no SHA `e64cd43e0290310948d5d34d33fcebdb5a348dd5`, mas nenhum artefato foi publicado devido à condição antiga.
 - A nova publicação só será considerada validada após uma execução de CI da PR produzir o artefato e permitir seu download.
+- Corrigido também o grupo de concorrência da CI para separar eventos `push` e `pull_request`; antes, os dois eventos da mesma branch podiam cancelar um ao outro e impedir a geração do artefato.
