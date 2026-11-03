@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — Proveniência do APK
+- A tela Configurações identifica o commit e a data/hora da compilação, além da versão do app.
+- O artefato Android inclui manifesto com versão, `versionCode`, SHA completo/curto, timestamp UTC e ID da execução CI.
+- A geração do manifesto é validada por teste automatizado e não altera a conexão OBD.
+
 ## Unreleased — Controle de versão do aplicativo
 - Definido SemVer estável MAJOR.MINOR.PATCH, sincronizado entre package.json, package-lock.json e app.json.
 - Adicionado android.versionCode derivado de MAJOR×10000 + MINOR×100 + PATCH; MINOR/PATCH limitados a 0–99 para garantir crescimento monotônico.

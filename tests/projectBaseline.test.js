@@ -29,6 +29,8 @@ const healthScreen = read('app/saude.tsx');
 const sensorEngine = read('src/diagnostics/sensorTestEngine.ts');
 const projectContract = read('docs/CONTRATO_ANTI_REGRESSAO.md');
 const diary = read('docs/DIARIO_DE_BORDO.md');
+const settingsScreen = read('app/configuracoes.tsx');
+const buildInfoScript = read('scripts/write-build-info.cjs');
 const theme = read('src/ui/theme.ts');
 const csvEncoding = read('src/storage/csvEncoding.ts');
 const diagnosticsExporter = read('src/storage/exportDiagnostics.ts');
@@ -44,6 +46,13 @@ assert.doesNotMatch(workflow, /^\s*contents:\s*write\s*$/m, 'the build workflow 
 assert.doesNotMatch(workflow, /github\.event\.repository\.visibility\s*==\s*'private'/, 'APK artifact must also be downloadable from the public project repository');
 assert.match(workflow, /github\.ref == 'refs\/heads\/main'/, 'APK artifact upload must be limited to main, never pull requests or work branches');
 assert.match(workflow, /retention-days:\s*14\b/, 'main APK artifact must remain available for 14 days');
+assert.match(workflow, /name: Embed APK build provenance[\s\S]*?run: node scripts\/write-build-info.cjs/);
+assert.match(workflow, /build\/meriva-build-info\.json/);
+assert.match(settingsScreen, /COMMIT DO APK/);
+assert.match(settingsScreen, /COMPILADO EM/);
+assert.match(settingsScreen, /CI RUN/);
+assert.match(buildInfoScript, /GITHUB_SHA/);
+assert.match(buildInfoScript, /GITHUB_RUN_ID/);
 assert.match(workflow, /sha256sum android\/app\/build\/outputs\/apk\/release\/app-release\.apk/, 'the APK must have a verifiable SHA-256 checksum');
 assert.match(workflow, /actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1/);
 assert.match(workflow, /actions\/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1/);
@@ -62,6 +71,7 @@ assert.match(workflow, /name: Validate release version metadata[\s\S]*?run: npm 
 // Removing a test file from the script must fail this gate before merge.
 const requiredSuites = [
   'versionControl.test.js',
+  'buildInfo.test.js',
   'dailyObdHistory.test.js',
   'pidParserIntegrity.test.js',
   'weatherRefresh.test.js',

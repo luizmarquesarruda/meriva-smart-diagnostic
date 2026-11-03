@@ -18,6 +18,12 @@ import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import { getMidLayout } from '../src/ui/midLayout';
 import { COLORS, SCREEN_TITLE_STYLE } from '../src/ui/theme';
 
+function formatBuildTime(iso: string | undefined): string {
+  if (!iso) return 'N/D';
+  const date = new Date(iso);
+  return Number.isFinite(date.getTime()) ? date.toLocaleString('pt-BR') : 'N/D';
+}
+
 function formatTime(iso: string | null): string {
   if (!iso) return 'N/D';
   try { return new Date(iso).toLocaleTimeString('pt-BR'); } catch { return 'N/D'; }
@@ -34,6 +40,11 @@ export default function ConfiguracaoScreen() {
   const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>({ lastSavedAt: null, lastSaveReason: null, lastError: null, obdSessionActive: false });
   const [backupOptions, setBackupOptions] = useState<StoredBackupInfo[]>([]);
   const appVersion = Constants.expoConfig?.version ?? '1.0.1';
+  const buildInfo = (Constants.expoConfig?.extra?.buildInfo ?? {}) as {
+    shortCommitSha?: string;
+    builtAtUtc?: string;
+    workflowRunId?: string;
+  };
 
   useEffect(() => {
     async function initStorage() {
@@ -378,6 +389,9 @@ export default function ConfiguracaoScreen() {
 
       <Text style={[styles.section,styles.sectionFullWidth]}>DADOS E MANUTENÇÃO</Text>
       <Text style={styles.info}>VERSÃO: {appVersion}</Text>
+      <Text style={styles.info}>COMMIT DO APK: {buildInfo.shortCommitSha ?? 'LOCAL'}</Text>
+      <Text style={styles.info}>COMPILADO EM: {formatBuildTime(buildInfo.builtAtUtc)}</Text>
+      <Text style={styles.info}>CI RUN: {buildInfo.workflowRunId ?? 'N/D'}</Text>
       
       <Text style={styles.info}>SALVAMENTO AUTOMÁTICO: ATIVO</Text>
       <Text style={styles.info}>ÚLTIMO SALVAMENTO: {formatTime(saveStatus.lastSavedAt)}</Text>

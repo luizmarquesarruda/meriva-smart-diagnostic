@@ -22,6 +22,14 @@
       ],
       "versionCode": 10001
     },
+    "extra": {
+      "buildInfo": {
+        "commitSha": "LOCAL",
+        "shortCommitSha": "LOCAL",
+        "builtAtUtc": null,
+        "workflowRunId": "LOCAL"
+      }
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
