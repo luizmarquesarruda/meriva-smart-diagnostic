@@ -297,6 +297,7 @@
 - **DB-193** · 2026-10-31 — Velocidade derivada GPS e recuperação atômica do histórico ECU
 - **DB-194** · 2026-10-31 — Auditoria estática do layout no Galaxy A06 / Android 16
 - **DB-195** · 2026-11-02 — Divergência visual do APK instalado e rastreabilidade da publicação
+- **DB-196** · 2026-11-03 — Identificação da compilação e manifesto de proveniência do APK
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -5032,3 +5033,18 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Confirmar que o artefato APK e o checksum foram publicados nessa execução, baixar o APK e registrar seu SHA-256/commit de origem.
 - Repetir a inspeção no Galaxy A06 em retrato, paisagem, escala padrão e fonte ampliada; medir os cinco alvos interativos e verificar a exibição completa do cartão de sessão.
 - Validar Bluetooth/ECU separadamente: a imagem atual não comprova resposta 010C nem conexão funcional.
+
+
+## DB-196 · 2026-11-03 — Identificação da compilação e manifesto de proveniência do APK
+
+### Alterações
+- Configurações apresenta versão SemVer, SHA curto do commit, data/hora da compilação e ID da execução GitHub. Builds locais sem metadados de CI identificam-se como `LOCAL`.
+- Adicionado `scripts/write-build-info.cjs`: durante o build Android, injeta a proveniência em `expo.extra.buildInfo` antes do prebuild e gera `build/meriva-build-info.json`.
+- O artefato Android da `main` passa a incluir APK, checksum SHA-256 e manifesto JSON com versão, `android.versionCode`, SHA completo/curto, timestamp UTC e ID da execução.
+- Criados testes unitários para metadados de CI, fallback local, validação de entrada e preservação de campos `extra` existentes. O gate de baseline verifica que a tela, script, workflow e manifesto permanecem ligados.
+- Nenhuma alteração em Bluetooth Classic, ELM327, ECU, comandos OBD, GPS, autonomia ou armazenamento de dados do veículo.
+
+### Validação
+- Aguardar `gate:baseline`, `validate` e `android-build` no SHA final desta PR.
+- Confirmar que builds de PR não fazem upload e que o push de `main` anexa o manifesto junto ao APK e checksum.
+- Instalar o APK no Galaxy A06 e comparar o SHA curto/ID da CI exibidos em Configurações com o manifesto baixado. Validação física permanece pendente até essa conferência.
