@@ -1093,6 +1093,27 @@ async function testAtomicJsonFileRecoveryAndPendingTemps() {
   );
   assert.strictEqual(files.get(BASE + '/atomic/missing-main.previous.json'), previousValue);
 
+  const futureTarget = BASE + '/atomic/future-main.json';
+  const futurePreviousPath = BASE + '/atomic/future-main.previous.json';
+  const futureMain = JSON.stringify({ schemaVersion: 2, value: 'escrito por versão futura' });
+  const validPrevious = JSON.stringify({ schemaVersion: 1, value: 'recuperação válida' });
+  files.set(futureTarget, futureMain);
+  files.set(futurePreviousPath, validPrevious);
+  const futureRecovery = await atomic.readJsonWithRecovery(futureTarget, isDocument, isFuture);
+  assert.deepStrictEqual(futureRecovery, {
+    value: { schemaVersion: 1, value: 'recuperação válida' },
+    recoveredFromPrevious: true,
+  }, 'schema futuro deve bloquear escrita, mas permitir leitura da cópia anterior validada');
+  assert.strictEqual(files.get(futureTarget), futureMain);
+  assert.strictEqual(files.get(futurePreviousPath), validPrevious);
+  const health = loadTs(path.join(ROOT, 'src/storage/storageHealth.ts'));
+  assert.ok(
+    health.getStorageHealthIssues().some((issue) =>
+      issue.id === 'FUTURE_SCHEMA:' + futureTarget,
+    ) || health.getStorageHealthIssues().some((issue) => issue.id === 'FUTURE_SCHEMA:CONFIG/app-settings.json'),
+    'schema futuro deve permanecer visível na Central de Saúde',
+  );
+
   const tempTarget = BASE + '/atomic/pending.json';
   const pendingTemp = tempTarget + '.tmp';
   const pending = JSON.stringify({ schemaVersion: 1, value: 'snapshot pendente' });

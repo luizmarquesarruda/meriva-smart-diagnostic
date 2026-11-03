@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system';
+import { recordStorageHealthIssue } from './storageHealth';
 
 export interface JsonRecoveryResult<T> {
   value: T | null;
@@ -58,11 +59,43 @@ export async function readJsonWithRecovery<T>(
   isFutureVersion: FutureVersionCheck = () => false,
 ): Promise<JsonRecoveryResult<T>> {
   const main = await readCandidate(path, validate, isFutureVersion);
-  if (main.kind === 'FUTURE') throw new Error('JSON_SCHEMA_VERSION_NEWER_THAN_APP: ' + path);
+  const resource = [
+    'CONFIG/app-settings.json',
+    'CONFIG/veiculo.json',
+    'APRENDIZADO/dna_meriva.json',
+    'MANUTENCAO/registros.json',
+  ].find((candidate) => path.endsWith('/' + candidate)) ?? path;
+
+  if (main.kind === 'FUTURE') {
+    recordStorageHealthIssue(
+      'FUTURE_SCHEMA',
+      'Schema JSON mais novo que o aplicativo',
+      'O principal foi preservado; uma cópia anterior será considerada apenas para leitura, se válida.',
+      'critical',
+      resource,
+    );
+  } else if (main.kind === 'INVALID') {
+    recordStorageHealthIssue(
+      'JSON_CORRUPTED',
+      'Arquivo JSON principal inválido',
+      'O principal foi preservado; uma cópia anterior será considerada apenas para leitura, se válida.',
+      'critical',
+      resource,
+    );
+  }
   if (main.kind === 'VALID') return { value: main.value, recoveredFromPrevious: false };
 
   const previous = await readCandidate(previousPath(path), validate, isFutureVersion);
-  if (previous.kind === 'FUTURE') throw new Error('JSON_PREVIOUS_SCHEMA_VERSION_NEWER_THAN_APP: ' + path);
+  if (previous.kind === 'FUTURE') {
+    recordStorageHealthIssue(
+      'FUTURE_SCHEMA',
+      'Schema JSON da cópia anterior mais novo que o aplicativo',
+      'A cópia anterior foi preservada e não pode ser interpretada por esta versão.',
+      'critical',
+      resource,
+    );
+    throw new Error('JSON_PREVIOUS_SCHEMA_VERSION_NEWER_THAN_APP: ' + path);
+  }
   if (previous.kind === 'VALID') return { value: previous.value, recoveredFromPrevious: true };
 
   if (main.kind === 'MISSING' && previous.kind === 'MISSING') {
