@@ -54,7 +54,8 @@ assert.equal(packageJson.scripts['version:check'], 'node scripts/version-control
 assert.equal(packageJson.version, app.expo.version, 'package.json e app.json precisam compartilhar a mesma versão');
 assert.equal(lock.version, packageJson.version, 'package-lock.json e package.json precisam compartilhar a mesma versão');
 assert.equal(lock.packages[''].version, packageJson.version, 'versão raiz do lockfile divergente');
-assert.equal(app.expo.android.versionCode, 10001, 'versionCode Android inicial deve corresponder a 1.0.1');
+const versionParts = packageJson.version.split('.').map(Number);
+assert.equal(app.expo.android.versionCode, versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2], 'versionCode Android deve acompanhar a versão SemVer');
 assert.match(workflow, /name: Validate release version metadata[\s\S]*?run: npm run version:check/);
 
 // Regression-sensitive suites must remain connected to npm test.

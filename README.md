@@ -232,3 +232,19 @@ npm run version:major   # mudança incompatível
 \`\`\`
 
 Os comandos atualizam \`package.json\`, \`package-lock.json\` e \`app.json\`. A CI verifica a consistência automaticamente. O incremento não cria tags/releases nem publica APK; a publicação de artefato permanece restrita ao push para \`main\`.
+
+## Controle de versão e releases
+
+O app usa SemVer estável (`MAJOR.MINOR.PATCH`). `package.json` é a referência operacional e deve permanecer sincronizado com `package-lock.json` e `app.json`. O `android.versionCode` é calculado como `MAJOR × 10000 + MINOR × 100 + PATCH`; MINOR e PATCH usam valores de 0 a 99.
+
+Antes de validar ou compilar, execute `npm run version:check`.
+
+Para preparar o próximo incremento:
+
+```bash
+npm run version:patch   # correção compatível
+npm run version:minor   # funcionalidade compatível
+npm run version:major   # mudança incompatível
+```
+
+Os comandos atualizam `package.json`, `package-lock.json` e `app.json`. A CI verifica a consistência automaticamente. O incremento não cria tags/releases nem publica APK; a publicação de artefato permanece restrita ao push para `main`.

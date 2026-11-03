@@ -252,10 +252,10 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 
 
 ## VERSION-01 — Controle de versão e release
-- SemVer estável no formato MAJOR.MINOR.PATCH; não usar prefixo \`v\`, sufixo ou zeros à esquerda.
-- \`package.json\`, \`package-lock.json\` (raiz e pacote vazio) e \`app.json\` devem declarar a mesma versão.
-- \`android.versionCode\` deve ser inteiro e igual a MAJOR×10000 + MINOR×100 + PATCH; MINOR e PATCH ficam entre 0 e 99.
-- \`npm run version:check\` reprova qualquer divergência; a CI o executa antes de TypeScript, testes e build.
-- Usar \`npm run version:patch\`, \`npm run version:minor\` ou \`npm run version:major\` para atualizar os três arquivos de metadados.
-- Não criar tag, GitHub Release ou publicar APK automaticamente. O APK continua sendo artefato somente do push para \`main\`.
+- SemVer estável no formato MAJOR.MINOR.PATCH; não usar prefixo `v`, sufixo ou zeros à esquerda.
+- `package.json`, `package-lock.json` (raiz e pacote vazio) e `app.json` devem declarar a mesma versão.
+- `android.versionCode` deve ser inteiro e igual a MAJOR×10000 + MINOR×100 + PATCH; MINOR e PATCH ficam entre 0 e 99.
+- `npm run version:check` reprova qualquer divergência; a CI o executa antes de TypeScript, testes e build.
+- Usar `npm run version:patch`, `npm run version:minor` ou `npm run version:major` para atualizar os três arquivos de metadados.
+- Não criar tag, GitHub Release ou publicar APK automaticamente. O APK continua sendo artefato somente do push para `main`.
 - Alterar a versão não comprova instalação nem funcionamento no Galaxy A06/ELM327; validação física permanece separada.
