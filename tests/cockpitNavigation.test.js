@@ -117,7 +117,7 @@ const actualCorePids = [...coreQuadrantDefinitions.matchAll(/pid: '([0-9A-F]{4})
 assert.deepEqual(actualCorePids, expectedCorePids, 'cockpit deve priorizar RPM, velocidade, temperatura e combustível');
 assert.match(index, /meriva-smart-vehicle-banner\.jpg/, 'cockpit deve usar a arte de veículo da referência');
 assert.match(index, /vehicleProfile\?\.engine/, 'descrição do veículo deve vir do perfil configurado, não de texto fixo');
-assert.match(index, /metric\.pid === '012F'.*?COLORS\.fuelAccent/, 'ícone de combustível deve usar token visual semântico');
+assert.match(index, /metric\.pid === '012F'[\\s\\S]*?COLORS\.fuelAccent/, 'ícone de combustível deve usar token visual semântico');
 assert.doesNotMatch(index, /\b(?:720|740)\s*(?:rpm)?\b|\b(?:88|90)\s*°C\b/i, 'valores demonstrativos da imagem não podem virar leituras reais');
 const theme = read('src/ui/theme.ts');
 for (const token of ['heroSurface', 'metricSurface', 'metricBorder', 'brandCyan', 'rpmAccent', 'speedAccent', 'temperatureAccent', 'fuelAccent']) {
