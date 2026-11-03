@@ -489,9 +489,10 @@ async function main() {
   let firstCollisionBackup;
   let secondCollisionBackup;
   try {
-    firstCollisionBackup = await backup.createBackup(collisionBase);
-    files.set(collisionBase + '/BANCO/state.json', 'snapshot-two');
-    secondCollisionBackup = await backup.createBackup(collisionBase);
+    [firstCollisionBackup, secondCollisionBackup] = await Promise.all([
+      backup.createBackup(collisionBase),
+      backup.createBackup(collisionBase),
+    ]);
   } finally {
     global.Date = RealDate;
   }
