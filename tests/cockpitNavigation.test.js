@@ -104,11 +104,23 @@ assert.match(laboratory, /setPid\(value\)/);
 assert.match(index, /layout\.landscape \? styles\.bottomNavLandscape : styles\.bottomNavPortrait/, 'retrato e paisagem devem selecionar contêineres de navegação próprios');
 assert.match(index, /bottomNavPortrait:\{backgroundColor:'transparent',borderWidth:0,padding:0,gap:6\}/, 'retratro não deve agrupar as abas em uma única superfície');
 assert.match(index, /bottomNavItemPortrait:\{backgroundColor:COLORS\.surface,borderWidth:1,borderColor:COLORS\.border,borderRadius:12,minHeight:60/, 'cada aba no retrato deve ter cartão independente com altura confortável');
-assert.match(index, /bottomNavActivePortrait:\{backgroundColor:'#152a45',borderColor:'#4b82b8'\}/, 'aba selecionada deve ter contorno de destaque em retrato');
+assert.match(index, /bottomNavActivePortrait:\{backgroundColor:'#152a45',borderColor:COLORS\.borderAccent\}/, 'aba selecionada deve ter contorno de destaque em retrato');
 assert.match(index, /bottomNavTextPortrait:\{fontSize:9\.5,lineHeight:12\}/, 'rótulos do retrato devem ser maiores que os rótulos compactos da paisagem');
 assert.equal((index.match(/!layout\.landscape && styles\.bottomNavItemPortrait/g) ?? []).length, 5, 'as cinco abas precisam receber o estilo individual em retrato');
 assert.equal((index.match(/hitSlop=\{4\}/g) ?? []).length, 5, 'as cinco abas devem ampliar a área de toque sem mudar a geometria da paisagem');
 assert.equal((index.match(/hitSlop=\{\{ top: 8, bottom: 8, left: 9, right: 9 \}\}/g) ?? []).length, 2, 'os dois controles de paginação devem atingir alvo de toque próximo de 48dp');
 assert.match(index, /footerStatus:\{color:COLORS\.textSubtle/, 'o rodapé do cockpit deve usar o token de texto com contraste revisado');
 
+const coreQuadrantDefinitions = index.slice(index.indexOf('const quadrantDefinitions'), index.indexOf('const discoveredByPid'));
+const expectedCorePids = ['010C', '010D', '0105', '012F'];
+const actualCorePids = [...coreQuadrantDefinitions.matchAll(/pid: '([0-9A-F]{4})'/g)].map((match) => match[1]);
+assert.deepEqual(actualCorePids, expectedCorePids, 'cockpit deve priorizar RPM, velocidade, temperatura e combustível');
+assert.match(index, /meriva-smart-vehicle-banner\.jpg/, 'cockpit deve usar a arte de veículo da referência');
+assert.match(index, /vehicleProfile\?\.engine/, 'descrição do veículo deve vir do perfil configurado, não de texto fixo');
+assert.match(index, /metric\.pid === '012F'[\s\S]*?COLORS\.fuelAccent/, 'ícone de combustível deve usar token visual semântico');
+assert.doesNotMatch(index, /\b(?:720|740)\s*(?:rpm)?\b|\b(?:88|90)\s*°C\b/i, 'valores demonstrativos da imagem não podem virar leituras reais');
+const theme = read('src/ui/theme.ts');
+for (const token of ['heroSurface', 'metricSurface', 'metricBorder', 'brandCyan', 'rpmAccent', 'speedAccent', 'temperatureAccent', 'fuelAccent']) {
+  assert.match(theme, new RegExp('\\b' + token + ':'));
+}
 console.log('Cockpit e telas secundárias: OK');

@@ -4,6 +4,9 @@ import { COLORS } from './theme';
 
 const ICONS = {
   cockpit: 'speedometer-outline',
+  rpm: 'pulse-outline',
+  speed: 'speedometer-outline',
+  fuel: 'water-outline',
   bluetooth: 'bluetooth-outline',
   more: 'grid-outline',
   diagnostic: 'build-outline',

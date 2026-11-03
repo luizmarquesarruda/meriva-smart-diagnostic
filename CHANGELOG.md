@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+### CI — artefato APK standalone em Pull Requests
+- Corrigido o teste de baseline que ainda bloqueava uploads fora da `main`, em conflito com a política aprovada de disponibilizar o APK nas execuções bem-sucedidas de branches e Pull Requests.
+- O gate agora exige o passo de upload sem restrição por evento/branch, nome estável `meriva-smart-diagnostic-standalone-apk` e retenção de 14 dias.
+- Mantidos verificação SHA-256 e ausência de publicação automática em GitHub Releases.
+
+### Cockpit MERIVA SMART baseado na referência visual
+- Atualizado o cabeçalho para MERIVA SMART e incorporada a arte ilustrativa do veículo ao cartão superior, usando o perfil local configurado para nome, motorização e ano.
+- Reorganizados os quatro quadrantes principais para RPM (010C), velocidade (010D), temperatura (0105) e nível de combustível (012F), com ícones e destaques azul/ciano, mantendo a validação de resposta real e frescor dos dados.
+- Reforçado o painel de estado da ECU com estado Bluetooth e protocolo efetivamente observados; mantidos consumo, autonomia, pressão do coletor, clima, conectividade e as cinco abas.
+- Nenhum valor fictício da imagem foi incorporado à telemetria. Leituras ausentes, vencidas ou não anunciadas permanecem como N/D.
+- A inspeção visual física, teste ELM327/ECU e validação CI/build ainda precisam ser concluídos no SHA final.
+
+### Layout adaptativo — Galaxy A06 e rotação
+- Mantida a orientação livre do Android e o recálculo da interface por `useWindowDimensions()`; o layout agora distingue paisagem compacta (altura da janela abaixo de 400 dp) e muito compacta (abaixo de 340 dp).
+- Em telas baixas, quadrantes, ícones, valores, dicas e espaçamentos reduzem de forma coordenada; métricas principais e navegação continuam presentes.
+- A resolução física Samsung 720 × 1600 px não é usada como dimensão de layout: os breakpoints usam o espaço útil da janela em dp.
+- Testes estruturais atualizados para a marca MERIVA SMART aprovada e para as novas regras responsivas. Capturas e validação física no Galaxy A06/Android 16 continuam pendentes.
+
+### Layout e consistência visual
+- Centralizadas as bordas dos componentes no tema compartilhado; o token principal oferece contraste mínimo de 3:1 sobre as superfícies do aplicativo.
+- Padronizadas bordas de cartões, controles e estados de conexão, preservando fundos, identidade azul/teal e cores funcionais dos dados.
+- Status de armazenamento e avisos passam a usar as cores semânticas do tema.
+- Testes verificam contraste para bordas e texto auxiliar e impedem a reintrodução de cores hexadecimais diretamente nas propriedades de borda.
+
 ### GPS / background location
 - Corrigido o fixture de recuperação para respeitar o timestamp estritamente crescente após amostras com precisão desconhecida.
 - Expandido o mock de Expo Location e incluídos testes de start/stop/reuso da tarefa nativa de localização em segundo plano.

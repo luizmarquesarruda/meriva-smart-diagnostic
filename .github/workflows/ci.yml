@@ -68,8 +68,7 @@ jobs:
         run: |
           sha256sum android/app/build/outputs/apk/release/app-release.apk > android/app/build/outputs/apk/release/app-release.apk.sha256
           sha256sum --check android/app/build/outputs/apk/release/app-release.apk.sha256
-      - name: Upload Android APK (main branch)
-        if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Upload Android standalone APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: meriva-smart-diagnostic-standalone-apk

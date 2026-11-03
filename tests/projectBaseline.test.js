@@ -42,8 +42,11 @@ assert.match(workflow, /group: ci-\$\{\{ github\.workflow \}\}-\$\{\{ github\.ev
 assert.doesNotMatch(workflow, /^\s*publish-release\s*:/m, 'CI must never create public GitHub Releases automatically');
 assert.doesNotMatch(workflow, /^\s*contents:\s*write\s*$/m, 'the build workflow must not request write access to repository contents');
 assert.doesNotMatch(workflow, /github\.event\.repository\.visibility\s*==\s*'private'/, 'APK artifact must also be downloadable from the public project repository');
-assert.match(workflow, /github\.ref == 'refs\/heads\/main'/, 'APK artifact upload must be limited to main, never pull requests or work branches');
-assert.match(workflow, /retention-days:\s*14\b/, 'main APK artifact must remain available for 14 days');
+const artifactUploadStep = workflow.split('- name: Upload Android standalone APK')[1]?.split('\n      - ')[0] ?? '';
+assert.ok(artifactUploadStep, 'standalone APK upload step must exist');
+assert.doesNotMatch(artifactUploadStep, /^\s*if:/m, 'standalone APK artifact must upload on successful PR, branch, and main builds');
+assert.match(artifactUploadStep, /name: meriva-smart-diagnostic-standalone-apk/, 'APK artifact must keep its stable download name');
+assert.match(artifactUploadStep, /retention-days:\s*14\b/, 'APK artifact must remain available for 14 days');
 assert.match(workflow, /sha256sum android\/app\/build\/outputs\/apk\/release\/app-release\.apk/, 'the APK must have a verifiable SHA-256 checksum');
 assert.match(workflow, /actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1/);
 assert.match(workflow, /actions\/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1/);
@@ -361,6 +364,9 @@ for (let index = 0; index < diaryEntryIds.length; index++) {
   );
 }
 assert.deepEqual(diaryIndexIds, diaryEntryIds, 'o índice DB-NNN precisa corresponder exatamente às entradas do diário');
+const diaryEntryTitles = [...diary.matchAll(/^#{1,4}\s+DB-\d{3}\b\s*[·—-]\s*(.*)$/gm)].map((match) => match[1].trim());
+const diaryIndexTitles = [...diary.matchAll(/^- \*\*(DB-\d{3})\*\*\s*[·—-]\s*(.*)$/gm)].map((match) => match[2].trim());
+assert.deepEqual(diaryIndexTitles, diaryEntryTitles, 'os títulos do índice DB-NNN precisam corresponder exatamente aos títulos das entradas');
 
 console.log('Anti-regression baseline gate: PASS');
 console.log('Protected contracts: five-read sensor tests, manual PID flow, single ELM327 queue, offline diagnosis, Expo SDK 51, GPS/Trip, TXT/history and cockpit/graphs.');

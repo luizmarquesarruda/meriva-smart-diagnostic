@@ -9,8 +9,8 @@
 - Validação PR #105: `validate` e `android-build` passaram no SHA `ff131e9b23ad745955dfe59904025a47cafabc98`.
 - Validação PR #104: `validate` e `android-build` passaram no SHA `2cdbda3807a50e68cd1fe24fe3ff207dc125dbfd`.
 - A CI também passou no push da `main` após a integração da PR #105, SHA `b128b413427e612e621dc2ef2c82b6c2476ce659`. O push de main após o merge da #104 está em execução e deve ser consultado no SHA final correspondente.
-- O repositório permanece público. PR #108 foi integrada por squash em `24651428eb4dff69ad3086627e739df07c1de4dd`: o upload do APK passou a ocorrer apenas em push para `main`, com retenção de 14 dias; não cria GitHub Release nem publica em branches/PRs.
-- O índice e os títulos do Diário estão alinhados até DB-194; DB-195 registra a divergência visual observada no APK instalado e a correção da publicação rastreável.
+- O repositório permanece público. A política restritiva introduzida na PR #108 foi revertida na PR #111: o APK standalone e o checksum devem ser enviados como Actions Artifact em toda execução bem-sucedida de `android-build` (PR, branch e `main`), com retenção de 14 dias; sem GitHub Release automático.
+- O índice e os títulos do Diário estão alinhados até DB-198; DB-195 registra a divergência visual do APK instalado, DB-196 a auditoria da paleta, DB-197 a adaptação do cockpit e DB-198 a correção do gate de publicação do artefato.
 - Não declarar inspeção visual ou teste físico no Galaxy A06 / SM-A065M / Android 16. Permanecem necessários screenshots em retrato/paisagem e teste ELM327/ECU real, incluindo respostas 010C/012F.
 - A execução CI da PR #108 (run `41205305161`, HEAD `83f702bd7d5247e53f5291f7806477ecdcf3e981`) aprovou `validate` e `android-build`; o upload foi corretamente ignorado por ser evento de PR. O push subsequente na `main` precisa concluir e publicar o artefato do SHA atual antes de enviar novo link de APK.
 
@@ -223,7 +223,7 @@
 - **DB-130** · 2026-10-25 — Otimização CSV avaliada e bloqueada pela versão instalada
 - **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
 - **DB-132** · 2026-10-27 — Cockpit sem duplicação de DTC; cartão substituído por pressão do coletor
-- **DB-133** · 2026-10-28 — CI: suíte de apresentação de saúde do ELM reintegrada ao npm test
+- **DB-133** · 2026-10-28 — CI: reintegrar suíte de apresentação de saúde do ELM
 - **DB-134** · 2026-10-28 — Corrigir contrato de layout obsoleto após remoção do DTC do cockpit
 - **DB-135** · 2026-10-28 — Corrigir navegação icon-only no cockpit
 - **DB-136** · 2026-10-28 — Sincronizar índice do diário após as novas entradas
@@ -233,13 +233,13 @@
 - **DB-140** · 2026-10-28 — Auditoria da rede móvel e dos provedores de localização
 - **DB-141** · 2026-10-28 — Auditoria profunda de PIDs, interpretação e integridade da IA local
 - **DB-142** · 2026-10-28 — Corrigir polaridade da prontidão no PID 0101
-- **DB-143** · 2026-10-28 — Decisão arquitetural: APK independente, sem dependência do Bubble
+- **DB-143** · 2026-10-28 — Aplicativo pessoal, independente e sem conta/login
 - **DB-144** · 2026-10-28 — Navegação por categorias, ícones e qualidade dos dados
 - **DB-145** · 2026-10-28 — Corrigir leitura KWP, retry e classificação do estado ECU/Bluetooth
 - **DB-146** · 2026-10-28 — Restaurar quadrantes 2×2 e paginação de PIDs no cockpit
 - **DB-147** · 2026-10-28 — Incluir os PIDs restantes no carrossel principal com navegação por setas
 - **DB-148** · 2026-10-28 — Auditoria e correção de cockpit em orientação paisagem
-- **DB-149** · 2026-10-28 — Grade 2×2 adaptável e navegação lateral direita em paisagem
+- **DB-149** · 2026-10-28 — Quadrantes adaptáveis em ambas as orientações
 - **DB-150** · 2026-10-28 — Auditoria crítica de layout e duplicações de conteúdo
 - **DB-151** · 2026-10-28 — Remoção do setter órfão após consolidar o Laboratório
 - **DB-152** · 2026-10-28 — Unificar marca visual entre cockpit e tela Viagens
@@ -253,7 +253,7 @@
 - **DB-160** · 2026-10-28 — Centralizar hipóteses da IA na tela Saúde
 - **DB-161** · 2026-10-28 — Corrigir rótulo obsoleto do atalho de armazenamento em Viagens
 - **DB-162** · 2026-10-29 — Limitar sondas nativas Bluetooth e falhar fechado em estado indeterminado
-- **DB-163** · 2026-10-29 — Aplicar timeout finito às sondas de disponibilidade e descoberta Bluetooth
+- **DB-163** · 2026-10-29 — Timeout finito para sondas de disponibilidade e descoberta Bluetooth
 - **DB-164** · 2026-10-29 — Limitar sondas nativas na preparação e ativação Bluetooth
 - **DB-165** · 2026-10-29 — Limitar a consulta HTTP opcional de clima e cancelar requisição vencida
 - **DB-166** · 2026-10-29 — Limitar sonda de rádio no monitor de saúde Bluetooth/ECU
@@ -275,10 +275,10 @@
 - **DB-182** · 2026-10-30 — Corrigir fixture de timestamp GPS e mockar ciclo de vida nativo em segundo plano
 - **DB-183** · 2026-10-30 — Confirmar movimento urbano sem exigir 8 m em cada callback GPS
 - **DB-184** · 2026-10-30 — Sincronizar índice DB-NNN com as novas entradas de auditoria
-- **DB-185** — Bloquear publicação pública/automática do APK; upload privado somente na branch main, checksum SHA-256 e Actions fixadas em commit.
-- **DB-186** — Desacoplar permissões GPS do OBD e centralizar o ciclo de vida de localização no AutoTripService.
-- **DB-187** · 2026-10-31 — Reconciliar Bluetooth, buffer 012F, backup e segurança de integração.
-- **DB-188** · 2026-10-31 — Integridade, privacidade e metadados verificados nos relatórios.
+- **DB-185** · 2026-10-31 — Bloquear publicação pública/automática do APK
+- **DB-186** · 2026-10-31 — Exigir opt-in GPS e centralizar a propriedade do rastreador
+- **DB-187** · 2026-10-31 — Reconciliar Bluetooth, buffer 012F, backup e segurança de integração
+- **DB-188** · 2026-10-31 — Integridade, privacidade e metadados verificados nos relatórios
 - **DB-189** · 2026-10-31 — Privacidade ampliada e snapshot do relatório Bluetooth
 - **DB-190** · 2026-10-31 — Preservação integral do histórico diário ECU
 - **DB-191** · 2026-10-31 — Consolidar layout responsivo sem regredir GPS, autonomia e restauração de backups
@@ -286,6 +286,9 @@
 - **DB-193** · 2026-10-31 — Velocidade derivada GPS e recuperação atômica do histórico ECU
 - **DB-194** · 2026-10-31 — Auditoria estática do layout no Galaxy A06 / Android 16
 - **DB-195** · 2026-11-02 — Divergência visual do APK instalado e rastreabilidade da publicação
+- **DB-196** · 2026-11-02 — Auditoria da paleta e contraste das bordas do layout
+- **DB-197** · 2026-11-02 — Adaptar cockpit à referência visual MERIVA SMART sem simular telemetria
+- **DB-198** · 2026-11-02 — Corrigir gate anti-regressão do artefato APK em PRs
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -302,7 +305,7 @@ Antes de qualquer correção de código:
 7. Se a CI falhar, registrar a falha e somente então iniciar a próxima correção.
 8. Manter documentação e repositório sincronizados.
 
-## DB-001 · 2026-10-06 - Correção do carregamento do catálogo de combustível
+## DB-001 · 2026-10-06 — Correção do carregamento do catálogo de combustível
 
 ### Problema
 A CI #661 falhou no teste `tests/fuelIdentification.test.js`. O teste transpila `src/obd/fuelIdentification.ts` diretamente para CommonJS e o import default de `src/knowledge/fuel_types.json` não foi resolvido como esperado. O catálogo chegou como indefinido e a leitura de `codes` falhou.
@@ -350,7 +353,7 @@ Nenhuma falha de CI será tratada como correção concluída.
 - **Teste:** adicionada regressão estática para impedir o retorno do laço infinito em `sharedConnection`.
 - **Regra preservada:** ELM327 Mini é tratado como adaptador genérico; a conexão só vira OBD válido após resposta real `010C` com `41 0C`.
 
-## DB-003 · 2026-10-07 - Primeira camada do motor de raciocínio diagnóstico local
+## DB-003 · 2026-10-07 — Primeira camada do motor de raciocínio diagnóstico local
 
 ### Objetivo
 Transformar a base de PIDs, DTCs e aprendizado em um motor local de hipóteses rastreáveis, sem depender de ChatGPT/OpenAI para funcionar.
@@ -5021,3 +5024,54 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Confirmar que o artefato APK e o checksum foram publicados nessa execução, baixar o APK e registrar seu SHA-256/commit de origem.
 - Repetir a inspeção no Galaxy A06 em retrato, paisagem, escala padrão e fonte ampliada; medir os cinco alvos interativos e verificar a exibição completa do cartão de sessão.
 - Validar Bluetooth/ECU separadamente: a imagem atual não comprova resposta 010C nem conexão funcional.
+
+
+## DB-196 · 2026-11-02 — Auditoria da paleta e contraste das bordas do layout
+
+### Alterações aplicadas
+- Auditoria da branch main no SHA `a741112b70b04d22a31b5512b92b1c60dfe61e22`: cores hexadecimais repetidas estavam declaradas diretamente nos estilos, apesar da existência de `src/ui/theme.ts`.
+- O token `COLORS.border` foi ajustado de `#28415f` para `#456a92`. O contraste calculado é aproximadamente 3,36:1 sobre `#07111f`, 3,07:1 sobre `#0e1b2d` e 3,03:1 sobre `#111c2e`.
+- Criados tokens explícitos para borda sutil, borda de seleção, estados de sucesso/falha e destaque teal. Bordas de cartões, seletores e componentes de navegação foram alinhadas ao tema sem substituir as cores funcionais da telemetria.
+- Status de armazenamento e avisos passam a consumir `COLORS.success`, `COLORS.warning` e `COLORS.danger`; texto auxiliar de baixo contraste foi trocado por `COLORS.textSubtle`.
+- `tests/screenTheme.test.js` agora verifica contraste mínimo 3:1 para bordas e 4,5:1 para texto auxiliar, além de bloquear valores hexadecimais diretamente nas propriedades de borda das telas.
+- Atualizada a expectativa do teste de navegação para a nova borda ativa tokenizada.
+
+### Limites e não regressão
+- Nenhuma alteração em Bluetooth Classic, ELM327, comandos/PIDs, ECU, polling, GPS, autonomia, telemetria, SQLite, histórico ou persistência.
+- A busca não encontrou arquivo, diretório ou alias `@/pantone`; não foi inventada uma especificação Pantone oficial. O tema existente permanece a fonte de cores do app.
+- Fonte ampliada/zoom do One UI continuam pendentes de inspeção visual no Galaxy A06. Esta mudança não declara validação física, screenshot ou teste de toque concluído.
+- A CI deve validar baseline, TypeScript, testes e build Android no SHA final da PR.
+
+
+## DB-197 · 2026-11-02 — Adaptar cockpit à referência visual MERIVA SMART sem simular telemetria
+
+### Alterações aplicadas
+- A tela inicial foi aproximada da referência visual: marca MERIVA SMART, faixa superior com ilustração do Meriva, fundo azul-marinho, bordas ciano e quatro cartões métricos com ícones e hierarquia visual ampliada.
+- O veículo, motorização e ano exibidos no cartão são lidos do perfil local existente; foi adicionada somente uma arte ilustrativa recortada do veículo em `assets/meriva-smart-vehicle-banner.jpg`.
+- Os quatro quadrantes principais passaram a priorizar RPM (010C), velocidade (010D), temperatura do motor (0105) e nível de combustível (012F).
+- O painel de estado passou a exibir Bluetooth e protocolo efetivamente observados pela sessão OBD.
+- Foram mantidos a verificação de origem REAL, a janela de validade das leituras, o estado N/D para leituras ausentes/vencidas, os cartões de consumo/autonomia/pressão, clima/rede e as cinco abas de navegação.
+
+### Limites e não regressão
+- Nenhum valor fictício do mockup foi incorporado ao código ou à telemetria.
+- Sem alteração no transporte Bluetooth Classic, inicialização ELM327, gate da ECU, comandos OBD, polling, fórmulas de consumo/autonomia, GPS, SQLite, histórico ou persistência.
+- O banner é arte ilustrativa e não uma captura do veículo em tempo real. O protocolo só é exibido quando a sessão fornece esse valor.
+- CI, TypeScript, testes, build Android, inspeção visual em retrato/paisagem e teste físico ELM327/ECU ainda precisam ser confirmados no SHA final.
+
+## DB-198 · 2026-11-02 — Corrigir gate anti-regressão do artefato APK em PRs
+
+### Causa raiz
+- A execução CI `41561487152` falhou no job `validate`, etapa `Run anti-regression baseline gate`, antes de TypeScript, testes e build Android.
+- `tests/projectBaseline.test.js` ainda exigia que o upload do APK fosse limitado a `refs/heads/main`, embora a configuração atual da CI já tivesse removido essa condição para disponibilizar o artefato em branches e Pull Requests.
+- A falha era uma contradição entre a política de distribuição aprovada e o teste de baseline; não era falha do Gradle, Expo Doctor ou do código de layout.
+
+### Correção aplicada
+- Atualizado o gate para exigir a presença da etapa `Upload Android standalone APK`, sem condição `if` que restrinja o upload a uma branch/evento.
+- O gate confirma o nome estável `meriva-smart-diagnostic-standalone-apk` e retenção de 14 dias.
+- Mantidos checksum SHA-256, falha explícita quando o APK não existir e ausência de GitHub Release automático.
+- Nenhuma alteração em Bluetooth, ELM327, ECU, PIDs, GPS, autonomia, telemetria, SQLite, histórico ou persistência.
+
+### Validação
+- A execução que identificou a regressão passou no Expo Doctor (17/17), mas falhou no baseline. TypeScript/testes e build Android foram ignorados por dependência.
+- A nova CI deve concluir baseline, TypeScript, testes e build Android no SHA atualizado. Até essa conclusão, APK do SHA corrigido: **não validado**.
+- Teste físico no Galaxy A06 / SM-A065M / Android 16 permanece **não validado**.

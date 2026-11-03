@@ -93,3 +93,51 @@ A auditoria não comprova defeito de layout no Galaxy A06 e não declara teste f
 - Samsung Support — ajustar fonte e zoom da tela: https://www.samsung.com/br/support/
 - React Native — compatibilidade por versão/plataforma: https://reactnative.dev/docs/environment-setup
 - Expo — Android 16 e edge-to-edge em SDKs recentes: https://expo.dev/blog
+
+
+---
+
+## Complemento — auditoria de paleta e contraste (2026-11-02)
+
+**Base examinada:** `main`, SHA `a741112b70b04d22a31b5512b92b1c60dfe61e22`.
+
+### Achados e correções
+
+- A inspeção das telas encontrou cores hexadecimais repetidas diretamente em propriedades de borda, apesar do tema compartilhado em `src/ui/theme.ts`.
+- O token `COLORS.border` original (`#28415f`) tinha contraste aproximado de 1,81:1 contra o fundo `#07111f`. Foi alterado para `#456a92`, com contraste calculado de aproximadamente 3,36:1 no fundo principal, 3,07:1 em `#0e1b2d` e 3,03:1 em `#111c2e`.
+- Tokens dedicados foram adicionados para bordas sutis/de seleção, bordas de sucesso/falha e destaque teal. As telas usam esses tokens em vez de repetir cores nas propriedades de borda.
+- Os estados de armazenamento foram padronizados com as cores semânticas de sucesso, aviso e erro. O texto auxiliar que usava `#64748b` passou a utilizar `COLORS.textSubtle`.
+- O teste estrutural de tema agora calcula contraste e reprova regressões de bordas hexadecimais diretas nos componentes.
+
+### Limites
+
+- A referência `@/pantone` não corresponde a arquivo, diretório ou alias encontrado na árvore do repositório. Nenhum código Pantone oficial foi presumido.
+- A auditoria é estática; não houve renderização, captura de tela ou teste em aparelho. A inspeção de fonte ampliada/zoom do One UI, recortes e alvos de toque no Galaxy A06 continua pendente.
+- A CI e o build Android devem ser avaliados no SHA final da PR. Não considerar este registro como validação física.
+
+---
+
+## Complemento — rotação adaptativa e especificação Samsung (2026-11-02)
+
+### Referência do aparelho
+
+A página oficial da Samsung Brasil para o Galaxy A06 / família SM-A065M publica tela de 6,7 polegadas, resolução HD+ de 720 × 1600 pixels e dimensões físicas de 167,3 × 77,3 × 8,0 mm. A Samsung Newsroom Brasil confirma a tela HD+ de 6,7 polegadas e as dimensões.
+
+Fontes oficiais:
+- Samsung Brasil — especificações SM-A065M: https://www.samsung.com/br/smartphones/galaxy-a/galaxy-a06-black-128gb-sm-a065mzkgzto/
+- Samsung Newsroom Brasil — apresentação e especificações Galaxy A06: https://news.samsung.com/br/samsung-apresenta-galaxy-a06-no-brasil
+
+A resolução em pixels não equivale diretamente às dimensões de layout em dp. Densidade configurada, barras do sistema, recortes, modo de navegação e zoom da tela alteram a janela útil. Por isso, a implementação não fixa 720/1600 como largura/altura e continua baseada em `useWindowDimensions()`.
+
+### Alterações implementadas na branch
+
+- Mantida a orientação Android `default` e a chamada `ScreenOrientation.unlockAsync()`; nenhuma trava fixa de retrato/paisagem foi adicionada.
+- O hook central `useMidLayout()` continua lendo largura/altura correntes da janela, reagindo à rotação.
+- Introduzido breakpoint de paisagem compacta abaixo de 400 dp de altura útil e de paisagem muito compacta abaixo de 340 dp.
+- No cockpit, o modo muito compacto reduz coordenadamente ícones, tipografia, dicas, espaçamento, padding e altura mínima dos quadrantes para reduzir risco de corte em paisagem. A versão padrão de paisagem preserva dimensões mais confortáveis.
+- A navegação vertical lateral e os quatro quadrantes prioritários permanecem presentes; não se ocultam indicadores para caber na tela.
+- Corrigidas as expectativas desatualizadas do teste de orientação que ainda exigiam a altura antiga de cartão e a identidade genérica substituída pela marca MERIVA SMART.
+
+### Limites de validação
+
+Os breakpoints 400/340 dp são regras de composição, não medidas físicas atribuídas ao Galaxy A06. O teste automatizado valida contratos estáticos e não mede a tela renderizada. Ainda é necessário instalar o APK do SHA final no SM-A065M e conferir retrato/paisagem, fonte/zoom ampliados, navegação por gestos e botões, alvos de toque, clipping e sobreposição. Portanto, teste visual físico: **não validado**.

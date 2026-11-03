@@ -535,7 +535,7 @@ export default function LaboratorioScreen() {
           autoCapitalize="characters"
           style={styles.input}
           placeholder="PID, ex.: 010C"
-          placeholderTextColor="#64748b"
+          placeholderTextColor={COLORS.textSubtle}
         />
         <TouchableOpacity style={styles.button} onPress={testPid} disabled={!storageReady || (mode === 'REAL' && !sessionRef.current)}>
           <Text style={styles.buttonText}>CONSULTAR PID</Text>
@@ -701,20 +701,20 @@ const styles = StyleSheet.create({
   dtcUnavailable: { color: COLORS.warning, fontSize: 8, fontWeight: '900' },
   dtcHint: { color: COLORS.textSubtle, fontSize: 9, lineHeight: 14, marginTop: 7 },
   dtcDetails: { marginTop: 10, borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 8 },
-  dtcDetailRow: { flexDirection: 'row', gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#203854' },
+  dtcDetailRow: { flexDirection: 'row', gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: COLORS.borderSubtle },
   dtcDetailCode: { color: COLORS.accent, fontWeight: '900', fontSize: 12, width: 52 },
   dtcDetailName: { color: COLORS.text, fontWeight: '900', fontSize: 11 },
   dtcDetailText: { color: COLORS.textSubtle, fontSize: 9, lineHeight: 14, marginTop: 2 },
-  pidPanel: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#315579' },
+  pidPanel: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
   pidRow: { flexDirection: 'row', gap: 9, paddingVertical: 8, borderTopWidth: 1, borderTopColor: COLORS.border },
   pidCode: { color: COLORS.accent, fontWeight: '900', fontSize: 11, width: 42 },
   pidName: { color: COLORS.text, fontWeight: '900', fontSize: 11 },
   pidDescription: { color: COLORS.textSubtle, fontSize: 9, lineHeight: 14, marginTop: 2 },
   pidMeta: { color: COLORS.primary, fontSize: 8, fontWeight: '800', marginTop: 3 },
-  formulaPanel: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: '#315579' },
+  formulaPanel: { backgroundColor: COLORS.surface, borderRadius: 10, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
   formulaHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 7 },
   formulaTitle: { color: COLORS.textStrong, fontSize: 16, fontWeight: '900', marginTop: 3 },
-  formulaBadge: { color: COLORS.success, fontSize: 8, fontWeight: '900', borderWidth: 1, borderColor: '#246747', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 5, overflow: 'hidden' },
+  formulaBadge: { color: COLORS.success, fontSize: 8, fontWeight: '900', borderWidth: 1, borderColor: COLORS.successBorder, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 5, overflow: 'hidden' },
   formulaDescription: { color: COLORS.textSubtle, fontSize: 10, lineHeight: 15, marginTop: 5, marginBottom: 7 },
   formulaRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: 1, borderTopColor: COLORS.border, paddingVertical: 9 },
   formulaValue: { color: COLORS.text, fontSize: 11, fontWeight: '900', marginBottom: 3 },
