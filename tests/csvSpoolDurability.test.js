@@ -10,6 +10,7 @@ const files = new Map();
 const directories = new Set(['/base', '/base/LOGS']);
 const unreadableDirectories = new Set();
 let failNextSpoolReadBack = false;
+let spoolReadBackFailures = 0;
 
 function info(filePath) {
   const isDirectory = directories.has(filePath);
@@ -45,6 +46,7 @@ const fakeFileSystem = {
   async readAsStringAsync(filePath) {
     if (failNextSpoolReadBack && filePath.includes('.tmp-')) {
       failNextSpoolReadBack = false;
+      spoolReadBackFailures += 1;
       throw new Error('SPOOL_READBACK_FAILURE: ' + filePath);
     }
     if (!files.has(filePath)) throw new Error('FILE_NOT_FOUND: ' + filePath);
@@ -196,8 +198,8 @@ async function main() {
 
   // A temporary segment whose read-back fails must be removed before retry.
   const readbackPath = '/base/LOGS/obd_raw_2026-11-01_readback.csv';
-  const readbackHeader = 'timestamp,eventId,pid\\n';
-  const existingRow = '2026-11-01T09:00:00.000Z,existing,010C\\n';
+  const readbackHeader = 'timestamp,eventId,pid\n';
+  const existingRow = '2026-11-01T09:00:00.000Z,existing,010C\n';
   const fillerBytes = logger.MAX_CSV_SEGMENT_BYTES
     - Buffer.byteLength(readbackHeader + existingRow, 'utf8') - 4;
   const readbackOriginal = readbackHeader + existingRow + 'x'.repeat(fillerBytes);
@@ -225,6 +227,28 @@ async function main() {
   const readbackRows = readbackSegments.flatMap((segment) => parseCsv(files.get(segment)).slice(1));
   assert.equal(readbackRows.filter((record) => record[1] === 'readback-retry').length, 1,
     'retry após falha de read-back deve persistir a linha exatamente uma vez');
+
+  // The live overflow path must restore the complete pending batch after a failed spool write.
+  const queueSpillPath = '/base/LOGS/obd_raw_2026-11-01_queue-spill.csv';
+  const overflowLogger = loadLogger();
+  const { MAX_PENDING_CSV_ROWS } = loadTs(path.join(ROOT, 'src/database/csvQueuePolicy.ts'));
+  failNextSpoolReadBack = true;
+  for (let index = 0; index < MAX_PENDING_CSV_ROWS; index += 1) {
+    overflowLogger.queueCsvRow(queueSpillPath, {
+      timestamp: new Date(Date.UTC(2026, 10, 1, 11, 0, 0, index * 1000)).toISOString(),
+      eventId: 'spill-' + index,
+      pid: '010C',
+    });
+  }
+  await overflowLogger.flushCsvLogs();
+  const queueSpillSegments = await overflowLogger.getCsvLogSegments(queueSpillPath);
+  const queueSpillRows = queueSpillSegments.flatMap((segment) => parseCsv(files.get(segment)).slice(1));
+  const queueSpillIds = queueSpillRows.map((record) => record[1]);
+  assert.equal(spoolReadBackFailures, 2, 'o teste deve atingir read-back nos caminhos append e overflow da fila');
+  assert.equal(queueSpillIds.length, MAX_PENDING_CSV_ROWS, 'o lote de overflow não pode perder linhas após retry');
+  assert.equal(new Set(queueSpillIds).size, MAX_PENDING_CSV_ROWS, 'retry do lote de overflow não pode duplicar linhas');
+  assert.ok(!Array.from(files.keys()).some((item) => item.includes('.tmp-')),
+    'nenhum arquivo temporário pode permanecer após falha e retry do spool');
 
   // Pre-upgrade .queue-* files remain visible and participate in ID deduplication.
   const legacyQueuePath = '/base/LOGS/obd_raw_2026-11-01.queue-1793520000000-000001.csv';
