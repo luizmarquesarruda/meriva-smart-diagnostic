@@ -34,12 +34,15 @@ assert.match(layout, /addOrientationChangeListener/);
 assert.match(layout, /subscription\.remove\(\)/, 'listener de orientação deve ser removido no cleanup');
 assert.match(index, /useMidLayout\(\)/);
 assert.match(index, /layout\.landscape/);
+assert.match(index, /layout\.landscapeVeryCompact/, 'cockpit deve consumir breakpoints de altura em paisagem');
 assert.match(index, /screenFrameLandscape:\{paddingRight:56/, 'paisagem deve reservar espaço na direita para a navegação lateral');
 assert.match(index, /topSectionLandscape:\{[^}]*flexDirection:'row'/, 'cabeçalho e clima devem compartilhar a faixa superior em paisagem');
 assert.match(index, /mainContentLandscape:\{[^}]*flexDirection:'row'/, 'cockpit e sessão devem dividir a largura em paisagem');
 assert.match(index, /sessionCardLandscape:\{width:166/, 'sessão deve usar coluna compacta em telas baixas');
 assert.match(index, /bottomNavLandscape:\{position:'absolute',right:0,top:0,bottom:20,width:50,flexDirection:'column'/, 'navegação deve virar uma raia vertical na direita');
 assert.match(index, /quadrantCardLandscape:\{minHeight:54,paddingVertical:4/, 'quadrantes devem reduzir altura e espaçamento vertical em paisagem');
+assert.match(index, /minHeight: layout\.landscapeVeryCompact \? 48 : layout\.landscapeCompact \? 54 : 62/, 'quadrantes devem adaptar a altura à janela em paisagem');
+assert.match(index, /size=\{layout\.landscape \? \(layout\.landscapeVeryCompact \? 15 : layout\.landscapeCompact \? 18 : 21\) : 27\}/, 'ícones dos quadrantes devem reduzir proporcionalmente em telas muito baixas');
 assert.match(index, /quadrantGrid:\{width:'100%',flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',gap:8\}/, 'quadrantes devem manter uma grade responsiva com quebra de linha');
 assert.match(index, /quadrantGridLandscape:\{gap:5\}/, 'a grade deve reduzir o espaçamento entre quadrantes em paisagem');
 assert.match(index, /styles\.quadrantGrid, layout\.landscape && styles\.quadrantGridLandscape/, 'a grade deve aplicar o estilo específico de paisagem');
@@ -103,6 +106,9 @@ assert.doesNotMatch(index, /actionGrid|dashboardAction/, 'navegação única nã
 assert.match(index, /react-native-safe-area-context/);
 assert.match(layout, /SafeAreaProvider/);
 assert.match(midLayout, /size\.width > size\.height/);
+assert.match(midLayout, /size\.height < 400/, 'paisagem compacta deve usar a altura lógica atual da janela');
+assert.match(midLayout, /size\.height < 340/, 'paisagem muito baixa deve ativar um conjunto mais compacto');
+assert.match(midLayout, /useWindowDimensions\(\)/, 'a rotação deve recalcular o layout sem recarregar o aplicativo');
 assert.doesNotMatch(index, /screenOrientation|OrientationLock\.(PORTRAIT|LANDSCAPE)/);
 
 assert.equal((healthScreen.match(/AMOSTRAS COM TIMESTAMP DUPLICADO BLOQUEADAS/g) || []).length, 1, 'Central de Saúde não deve duplicar o contador de timestamps');
@@ -119,7 +125,7 @@ assert.match(healthScreen, /HIPÓTESES LOCAIS/, 'Central de Saúde continua apre
 assert.match(laboratoryScreen, /paddingBottom: 30/, 'Laboratório deve usar margem final normal, sem reservar uma barra inexistente');
 assert.doesNotMatch(storageScreen, /VIAGENS SALVAS/, 'armazenamento não deve duplicar a lista da tela Viagens');
 assert.match(storageScreen, /href=\"\/viagens\"/, 'armazenamento deve encaminhar para o relatório canônico de viagens');
-assert.match(index, /SMART OBD DIAGNOSTIC/, 'cockpit deve usar o nome genérico definido para o aplicativo');
+assert.match(index, /MERIVA SMART/, 'cockpit deve preservar a identidade visual MERIVA SMART aprovada');
 assert.match(tripScreen, /SMART OBD DIAGNOSTIC/, 'telas de relatórios devem manter a mesma marca visual do cockpit');
 assert.doesNotMatch(tripScreen, /MERIVA SMART DIAGNOSTIC/, 'uma tela secundária não pode exibir uma marca divergente do cabeçalho do app');
 assert.ok(tripScreen.includes('ABRIR ARMAZENAMENTO E EXPORTAÇÃO'), 'atalho de Viagens deve usar o nome canônico da tela de arquivos');

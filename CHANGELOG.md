@@ -9,6 +9,12 @@
 - Nenhum valor fictício da imagem foi incorporado à telemetria. Leituras ausentes, vencidas ou não anunciadas permanecem como N/D.
 - A inspeção visual física, teste ELM327/ECU e validação CI/build ainda precisam ser concluídos no SHA final.
 
+### Layout adaptativo — Galaxy A06 e rotação
+- Mantida a orientação livre do Android e o recálculo da interface por `useWindowDimensions()`; o layout agora distingue paisagem compacta (altura da janela abaixo de 400 dp) e muito compacta (abaixo de 340 dp).
+- Em telas baixas, quadrantes, ícones, valores, dicas e espaçamentos reduzem de forma coordenada; métricas principais e navegação continuam presentes.
+- A resolução física Samsung 720 × 1600 px não é usada como dimensão de layout: os breakpoints usam o espaço útil da janela em dp.
+- Testes estruturais atualizados para a marca MERIVA SMART aprovada e para as novas regras responsivas. Capturas e validação física no Galaxy A06/Android 16 continuam pendentes.
+
 ### Layout e consistência visual
 - Centralizadas as bordas dos componentes no tema compartilhado; o token principal oferece contraste mínimo de 3:1 sobre as superfícies do aplicativo.
 - Padronizadas bordas de cartões, controles e estados de conexão, preservando fundos, identidade azul/teal e cores funcionais dos dados.

@@ -405,7 +405,7 @@ export default function IndexScreen() {
             </View>
           </View>
           <View style={[styles.mainContent, layout.landscape && styles.mainContentLandscape]}>
-          <View style={[styles.heroCard, layout.landscape && styles.heroCardLandscape]}>
+          <View style={[styles.heroCard, layout.landscape && styles.heroCardLandscape, layout.landscapeVeryCompact && { padding: 4 }]}>
             <View style={[styles.quadrantHeader, layout.landscape && styles.quadrantHeaderLandscape]}>
               <View style={styles.quadrantHeaderCopy}>
                 <Text style={styles.quadrantTitle}>DADOS OBD EM TEMPO REAL</Text>
@@ -444,13 +444,14 @@ export default function IndexScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-            <View style={[styles.quadrantGrid, layout.landscape && styles.quadrantGridLandscape]}>
+            <View style={[styles.quadrantGrid, layout.landscape && styles.quadrantGridLandscape, layout.landscape && { gap: layout.landscapeVeryCompact ? 3 : layout.landscapeCompact ? 4 : 5 }]}>
               {displayedQuadrantMetrics.map((metric, index) => (
                 <View
                   key={metric.pid || 'quadrant-' + index}
                   style={[
                     styles.quadrantCard,
                     layout.landscape && styles.quadrantCardLandscape,
+                    layout.landscape && { minHeight: layout.landscapeVeryCompact ? 48 : layout.landscapeCompact ? 54 : 62, paddingVertical: layout.landscapeVeryCompact ? 2 : layout.landscapeCompact ? 3 : 4, paddingHorizontal: layout.landscapeVeryCompact ? 4 : 6 },
                     metric.severity === 'danger' && styles.quadrantCardDanger,
                     metric.severity === 'warning' && styles.quadrantCardWarning,
                   ]}
@@ -458,15 +459,16 @@ export default function IndexScreen() {
                   <View style={[styles.quadrantMetricIcon, layout.landscape && styles.quadrantMetricIconLandscape]}>
                     <AppIcon
                       name={metric.pid === '010C' ? 'rpm' : metric.pid === '010D' ? 'speed' : metric.pid === '0105' ? 'coolant' : metric.pid === '012F' ? 'fuel' : 'diagnostic'}
-                      size={layout.landscape ? 21 : 27}
+                      size={layout.landscape ? (layout.landscapeVeryCompact ? 15 : layout.landscapeCompact ? 18 : 21) : 27}
                       color={metric.pid === '010C' ? COLORS.rpmAccent : metric.pid === '010D' ? COLORS.speedAccent : metric.pid === '0105' ? COLORS.temperatureAccent : metric.pid === '012F' ? COLORS.fuelAccent : COLORS.accent}
                     />
                   </View>
-                  <Text style={[styles.quadrantLabel, layout.landscape && styles.quadrantLabelLandscape]} numberOfLines={layout.landscape ? 1 : 2}>{metric.label}</Text>
-                  <View style={[styles.quadrantValueRow, layout.landscape && styles.quadrantValueRowLandscape]}>
+                  <Text style={[styles.quadrantLabel, layout.landscape && styles.quadrantLabelLandscape, layout.landscape && { fontSize: layout.landscapeVeryCompact ? 7 : layout.landscapeCompact ? 7.5 : 8, lineHeight: layout.landscapeVeryCompact ? 8 : 9 }]} numberOfLines={layout.landscape ? 1 : 2}>{metric.label}</Text>
+                  <View style={[styles.quadrantValueRow, layout.landscape && styles.quadrantValueRowLandscape, layout.landscapeVeryCompact && { marginTop: 1 }]}>
                     <Text style={[
                       styles.quadrantValue,
                       layout.landscape && styles.quadrantValueLandscape,
+                      layout.landscape && { fontSize: layout.landscapeVeryCompact ? 17 : layout.landscapeCompact ? 19 : 21, lineHeight: layout.landscapeVeryCompact ? 18 : layout.landscapeCompact ? 20 : 22 },
                       metric.severity === 'danger' && styles.danger,
                       metric.severity === 'warning' && styles.heroWarning,
                     ]}>
@@ -474,11 +476,11 @@ export default function IndexScreen() {
                     </Text>
                     {metric.value != null && !!metric.unit && <Text style={styles.quadrantUnit}>{metric.unit}</Text>}
                   </View>
-                  <Text style={[styles.quadrantHint, layout.landscape && styles.quadrantHintLandscape]} numberOfLines={layout.landscape ? 1 : 2}>{metric.hint}</Text>
+                  <Text style={[styles.quadrantHint, layout.landscape && styles.quadrantHintLandscape, layout.landscape && { fontSize: layout.landscapeVeryCompact ? 6 : layout.landscapeCompact ? 6.5 : 8, lineHeight: layout.landscapeVeryCompact ? 7 : layout.landscapeCompact ? 7 : 9, marginTop: layout.landscapeVeryCompact ? 0 : 1 }]} numberOfLines={layout.landscape ? 1 : 2}>{metric.hint}</Text>
                 </View>
               ))}
             </View>
-            <Text style={[styles.quadrantInstruction, layout.landscape && styles.quadrantInstructionLandscape]}>
+            <Text style={[styles.quadrantInstruction, layout.landscape && styles.quadrantInstructionLandscape, layout.landscapeVeryCompact && { fontSize: 7, lineHeight: 8, marginTop: 1 }]}>
               {quadrantPageCount > 1
                 ? 'USE ‹ / › OU AGUARDE 10 S • 4 QUADRANTES POR PÁGINA'
                 : connectionStatus.ecuConnected
@@ -583,14 +585,14 @@ const styles = StyleSheet.create({
   quadrantGrid:{width:'100%',flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',gap:8},
   quadrantGridLandscape:{gap:5},
   quadrantCard:{width:'48%',minHeight:100,paddingVertical:8,paddingHorizontal:9,backgroundColor:COLORS.metricSurface,borderRadius:13,borderWidth:1.5,borderColor:COLORS.metricBorder,alignItems:'center',justifyContent:'center'},
-  quadrantCardLandscape:{minHeight:62,paddingVertical:4,paddingHorizontal:6},quadrantMetricIcon:{alignItems:'center',justifyContent:'center',marginBottom:4},quadrantMetricIconLandscape:{marginBottom:1},
+  quadrantCardLandscape:{minHeight:54,paddingVertical:4,paddingHorizontal:6},quadrantMetricIcon:{alignItems:'center',justifyContent:'center',marginBottom:4},quadrantMetricIconLandscape:{marginBottom:1},
   quadrantCardWarning:{borderColor:COLORS.warning,backgroundColor:'#2a2412'},
   quadrantCardDanger:{borderColor:COLORS.danger,backgroundColor:'#2b1420'},
   quadrantLabel:{color:'#c5e8ff',fontSize:9,fontWeight:'900',letterSpacing:.35,textAlign:'center'},quadrantLabelLandscape:{fontSize:8,lineHeight:9,letterSpacing:0},
   quadrantValueRow:{flexDirection:'row',alignItems:'baseline',gap:4,marginTop:5},quadrantValueRowLandscape:{marginTop:2,gap:3},
-  quadrantValue:{color:COLORS.textStrong,fontSize:29,lineHeight:33,fontWeight:'900',fontVariant:['tabular-nums']},quadrantValueLandscape:{fontSize:22,lineHeight:23},
+  quadrantValue:{color:COLORS.textStrong,fontSize:29,lineHeight:33,fontWeight:'900',fontVariant:['tabular-nums']},quadrantValueLandscape:{fontSize:21,lineHeight:22},
   quadrantUnit:{color:'#a9c8ef',fontSize:10,fontWeight:'900'},
-  quadrantHint:{color:COLORS.textMuted,fontSize:7.5,fontWeight:'800',marginTop:3,textAlign:'center'},quadrantHintLandscape:{fontSize:7,lineHeight:8,marginTop:1},
+  quadrantHint:{color:COLORS.textMuted,fontSize:7.5,fontWeight:'800',marginTop:3,textAlign:'center'},quadrantHintLandscape:{fontSize:8,lineHeight:9,marginTop:1},
   quadrantInstruction:{color:COLORS.textSubtle,fontSize:8,fontWeight:'900',letterSpacing:.2,textAlign:'center',marginTop:7,lineHeight:12},quadrantInstructionLandscape:{fontSize:8,lineHeight:10,letterSpacing:0,marginTop:3},
   coolantCard:{width:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12,marginTop:9,paddingHorizontal:13,paddingVertical:11,backgroundColor:COLORS.surfaceInset,borderRadius:12,borderWidth:1,borderColor:COLORS.border},coolantCardLandscape:{marginTop:4,paddingVertical:5,paddingHorizontal:9},coolantCopy:{flex:1,minWidth:0},coolantHeading:{flexDirection:'row',alignItems:'center',gap:5},coolantLabel:{color:'#c5d8f2',fontSize:9,fontWeight:'900',letterSpacing:.4},coolantStatus:{color:COLORS.textSubtle,fontSize:8,fontWeight:'800',marginTop:4},coolantValue:{fontSize:23,fontWeight:'900',fontVariant:['tabular-nums']},coolantOk:{color:COLORS.success},coolantWarning:{color:COLORS.warning},coolantUnavailable:{color:'#8fa6c1'},
   danger:{color:COLORS.danger},

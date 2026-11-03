@@ -114,3 +114,30 @@ A auditoria não comprova defeito de layout no Galaxy A06 e não declara teste f
 - A referência `@/pantone` não corresponde a arquivo, diretório ou alias encontrado na árvore do repositório. Nenhum código Pantone oficial foi presumido.
 - A auditoria é estática; não houve renderização, captura de tela ou teste em aparelho. A inspeção de fonte ampliada/zoom do One UI, recortes e alvos de toque no Galaxy A06 continua pendente.
 - A CI e o build Android devem ser avaliados no SHA final da PR. Não considerar este registro como validação física.
+
+---
+
+## Complemento — rotação adaptativa e especificação Samsung (2026-11-02)
+
+### Referência do aparelho
+
+A página oficial da Samsung Brasil para o Galaxy A06 / família SM-A065M publica tela de 6,7 polegadas, resolução HD+ de 720 × 1600 pixels e dimensões físicas de 167,3 × 77,3 × 8,0 mm. A Samsung Newsroom Brasil confirma a tela HD+ de 6,7 polegadas e as dimensões.
+
+Fontes oficiais:
+- Samsung Brasil — especificações SM-A065M: https://www.samsung.com/br/smartphones/galaxy-a/galaxy-a06-black-128gb-sm-a065mzkgzto/
+- Samsung Newsroom Brasil — apresentação e especificações Galaxy A06: https://news.samsung.com/br/samsung-apresenta-galaxy-a06-no-brasil
+
+A resolução em pixels não equivale diretamente às dimensões de layout em dp. Densidade configurada, barras do sistema, recortes, modo de navegação e zoom da tela alteram a janela útil. Por isso, a implementação não fixa 720/1600 como largura/altura e continua baseada em `useWindowDimensions()`.
+
+### Alterações implementadas na branch
+
+- Mantida a orientação Android `default` e a chamada `ScreenOrientation.unlockAsync()`; nenhuma trava fixa de retrato/paisagem foi adicionada.
+- O hook central `useMidLayout()` continua lendo largura/altura correntes da janela, reagindo à rotação.
+- Introduzido breakpoint de paisagem compacta abaixo de 400 dp de altura útil e de paisagem muito compacta abaixo de 340 dp.
+- No cockpit, o modo muito compacto reduz coordenadamente ícones, tipografia, dicas, espaçamento, padding e altura mínima dos quadrantes para reduzir risco de corte em paisagem. A versão padrão de paisagem preserva dimensões mais confortáveis.
+- A navegação vertical lateral e os quatro quadrantes prioritários permanecem presentes; não se ocultam indicadores para caber na tela.
+- Corrigidas as expectativas desatualizadas do teste de orientação que ainda exigiam a altura antiga de cartão e a identidade genérica substituída pela marca MERIVA SMART.
+
+### Limites de validação
+
+Os breakpoints 400/340 dp são regras de composição, não medidas físicas atribuídas ao Galaxy A06. O teste automatizado valida contratos estáticos e não mede a tela renderizada. Ainda é necessário instalar o APK do SHA final no SM-A065M e conferir retrato/paisagem, fonte/zoom ampliados, navegação por gestos e botões, alvos de toque, clipping e sobreposição. Portanto, teste visual físico: **não validado**.
