@@ -259,3 +259,14 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 - Usar `npm run version:patch`, `npm run version:minor` ou `npm run version:major` para atualizar os três arquivos de metadados.
 - Não criar tag, GitHub Release ou publicar APK automaticamente. O APK continua sendo artefato somente do push para `main`.
 - Alterar a versão não comprova instalação nem funcionamento no Galaxy A06/ELM327; validação física permanece separada.
+
+
+## Integridade dos arquivos JSON críticos — fase 1
+- Verificar principal ausente, válido, corrompido, diretório inesperado e schema futuro.
+- Verificar cópia anterior válida, corrompida e futura.
+- Verificar temporário pendente válido e inválido: preservar o arquivo e bloquear nova gravação.
+- Verificar leitura por cópia anterior sem reparo automático.
+- Verificar primeira gravação e atualização com read-back, mantendo o snapshot anterior.
+- Verificar configurações, perfil do veículo, aprendizado e manutenção sem substituir arquivos corrompidos por defaults.
+- A Central de Saúde deve mostrar avisos de recuperação, corrupção, schema futuro ou falha do autosave.
+- Teste físico de persistência/recuperação no Galaxy A06: **não validado** até ensaio no aparelho.

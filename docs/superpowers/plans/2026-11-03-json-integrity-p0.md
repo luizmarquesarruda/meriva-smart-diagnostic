@@ -46,43 +46,43 @@
 
 - [x] Adicionar testes que exigem preservação byte a byte após leitura/escrita de configurações, veículo, aprendizado e manutenção corrompidos.
 - [x] Estender o caso de schema futuro do autosave para exigir falha no salvamento seguinte e preservação do principal e previous.
-- [ ] Confirmar CI vermelha por falha de comportamento esperada, não por erro de sintaxe.
+- [x] Confirmar CI vermelha por falha de comportamento esperada, não por erro de sintaxe.
 
 ## Task 2: Implementar o contrato JSON comum
 
 **Files:** src/storage/atomicJsonFile.ts, src/storage/storageHealth.ts, tests/regression.test.js.
 
-- [ ] Implementar `readJsonWithRecovery<T>(path, validate, isFutureVersion)`.
-- [ ] Implementar `writeJsonAtomically<T>(path, value, validate, isFutureVersion)`, com fila por caminho, temporário fixo, leitura de retorno e backup anterior validado.
-- [ ] Bloquear temporário pendente e backup temporário pendente.
-- [ ] Testar criação inicial, atualização, recuperação somente leitura, corrupção, schema futuro, diretório e falha de substituição.
+- [x] Implementar `readJsonWithRecovery<T>(path, validate, isFutureVersion)`.
+- [x] Implementar `writeJsonAtomically<T>(path, value, validate, isFutureVersion)`, com fila por caminho, temporário fixo, leitura de retorno e backup anterior validado.
+- [x] Bloquear temporário pendente e backup temporário pendente.
+- [x] Testar criação inicial, atualização, recuperação somente leitura, corrupção, schema futuro, diretório e falha de substituição.
 
 ## Task 3: Proteger consumidores JSON
 
 **Files:** src/database/appSettings.ts, vehicleConfig.ts, learningProfile.ts, maintenanceStorage.ts.
 
-- [ ] Preservar defaults somente para arquivo ausente.
-- [ ] Retornar dados recuperados apenas em memória e registrar aviso quando usar cópia anterior.
-- [ ] Bloquear writes sobre principal/previous inválidos ou futuros.
-- [ ] Validar documentos completos sem rejeitar legados válidos sem schemaVersion.
+- [x] Preservar defaults somente para arquivo ausente.
+- [x] Retornar dados recuperados apenas em memória e registrar aviso quando usar cópia anterior.
+- [x] Bloquear writes sobre principal/previous inválidos ou futuros.
+- [x] Validar documentos completos sem rejeitar legados válidos sem schemaVersion.
 - [ ] Confirmar que aprendizado real e dados de origem não mudaram.
 
 ## Task 4: Fechar a lacuna do autosave
 
 **Files:** src/meriva/autosaveManager.ts, tests/merivaAutosave.test.js.
 
-- [ ] Inspecionar principal e cópia anterior antes de substituir qualquer arquivo.
-- [ ] Bloquear temporário preexistente, válido ou inválido.
-- [ ] Preservar todos os arquivos byte a byte no caminho de falha.
-- [ ] Manter leitura do fallback apenas para hidratação em memória.
+- [x] Inspecionar principal e cópia anterior antes de substituir qualquer arquivo.
+- [x] Bloquear temporário preexistente, válido ou inválido.
+- [x] Preservar todos os arquivos byte a byte no caminho de falha.
+- [x] Manter leitura do fallback apenas para hidratação em memória.
 
 ## Task 5: Tornar falhas visíveis e documentadas
 
 **Files:** app/saude.tsx, tests/projectBaseline.test.js, docs/CONTRATO_ANTI_REGRESSAO.md, docs/TEST_PLAN.md, docs/DIARIO_DE_BORDO.md, CHANGELOG.md.
 
-- [ ] Exibir avisos de JSON corrompido, recuperação e schema futuro na Central de Saúde.
-- [ ] Fixar RG-56 e os testes correspondentes no gate de baseline.
-- [ ] Registrar política, escopo, PR e estado de CI; declarar ensaio físico como não validado.
+- [x] Exibir avisos de JSON corrompido, recuperação e schema futuro na Central de Saúde.
+- [x] Fixar RG-56 e os testes correspondentes no gate de baseline.
+- [x] Registrar política, escopo e ensaio físico como não validado; CI e PR aguardam verificação final.
 
 ## Task 6: Verificação final da fase
 

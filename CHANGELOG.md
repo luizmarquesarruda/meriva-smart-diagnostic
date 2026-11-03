@@ -9,6 +9,9 @@
 
 ## Unreleased
 
+- Persistência JSON: bloqueia sobrescrita de arquivos corrompidos, inválidos, de schema futuro e temporários pendentes em autosave, configurações, veículo, aprendizado e manutenção. A recuperação por cópia anterior é somente leitura.
+- Saúde: exibe avisos de integridade dos arquivos locais, sem alterar Bluetooth, GPS, autonomia ou histórico diário ECU.
+
 ### GPS / background location
 - Corrigido o fixture de recuperação para respeitar o timestamp estritamente crescente após amostras com precisão desconhecida.
 - Expandido o mock de Expo Location e incluídos testes de start/stop/reuso da tarefa nativa de localização em segundo plano.

@@ -21,7 +21,7 @@
 - Validação PR #104: `validate` e `android-build` passaram no SHA `2cdbda3807a50e68cd1fe24fe3ff207dc125dbfd`.
 - A CI também passou no push da `main` após a integração da PR #105, SHA `b128b413427e612e621dc2ef2c82b6c2476ce659`. O push de main após o merge da #104 está em execução e deve ser consultado no SHA final correspondente.
 - O repositório permanece público. PR #108 foi integrada por squash em `24651428eb4dff69ad3086627e739df07c1de4dd`: o upload do APK passou a ocorrer apenas em push para `main`, com retenção de 14 dias; não cria GitHub Release nem publica em branches/PRs.
-- O índice e os títulos do Diário estão alinhados até DB-194; DB-195 registra a divergência visual observada no APK instalado e a correção da publicação rastreável.
+- O índice e os títulos do Diário estão alinhados até DB-196; DB-195 registra a divergência visual observada no APK instalado e DB-196 a proteção dos arquivos JSON críticos.
 - Não declarar inspeção visual ou teste físico no Galaxy A06 / SM-A065M / Android 16. Permanecem necessários screenshots em retrato/paisagem e teste ELM327/ECU real, incluindo respostas 010C/012F.
 - A execução CI da PR #108 (run `41205305161`, HEAD `83f702bd7d5247e53f5291f7806477ecdcf3e981`) aprovou `validate` e `android-build`; o upload foi corretamente ignorado por ser evento de PR. O push subsequente na `main` precisa concluir e publicar o artefato do SHA atual antes de enviar novo link de APK.
 
@@ -297,6 +297,7 @@
 - **DB-193** · 2026-10-31 — Velocidade derivada GPS e recuperação atômica do histórico ECU
 - **DB-194** · 2026-10-31 — Auditoria estática do layout no Galaxy A06 / Android 16
 - **DB-195** · 2026-11-02 — Divergência visual do APK instalado e rastreabilidade da publicação
+- **DB-196** · 2026-11-03 — Proteger arquivos JSON críticos contra corrupção, schema futuro e temporários pendentes
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -5032,3 +5033,23 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Confirmar que o artefato APK e o checksum foram publicados nessa execução, baixar o APK e registrar seu SHA-256/commit de origem.
 - Repetir a inspeção no Galaxy A06 em retrato, paisagem, escala padrão e fonte ampliada; medir os cinco alvos interativos e verificar a exibição completa do cartão de sessão.
 - Validar Bluetooth/ECU separadamente: a imagem atual não comprova resposta 010C nem conexão funcional.
+
+
+## DB-196 · 2026-11-03 — Proteção dos arquivos JSON críticos
+
+### Alterações na branch
+- Branch: `fix/phase1-json-integrity-20261103`, derivada de `main` no SHA `472cedf215e2d4e0fd18331196946cf256e2d7c4`.
+- Criado `src/storage/atomicJsonFile.ts` com leitura por cópia anterior validada, gravação serializada, temporário fixo, read-back e bloqueio de principal/cópia/temporários inválidos ou futuros.
+- Protegidos autosave, configurações, perfil do veículo, aprendizado e manutenção. A inicialização pode usar defaults/perfil de sessão somente em memória quando necessário; os arquivos originais não são substituídos.
+- A Central de Saúde passou a exibir avisos de integridade do armazenamento.
+- Mantidos JSON/TXT/CSV. Sem SQLite e sem mudanças em Bluetooth, ECU, GPS, autonomia, comandos OBD ou histórico diário ECU.
+
+### Verificação
+- Testes de regressão cobrem corrupção nos cinco módulos JSON, cópia anterior somente leitura, temporário pendente e próximo salvamento após schema futuro.
+- A CI do commit de teste `92f60339bbdb31652753675008f471a61932301d` reproduziu a falha esperada do autosave futuro (RED).
+- A validação GREEN desta implementação depende da CI do SHA final desta branch; não reutilizar resultados de SHAs anteriores.
+- Persistência/recuperação física no Galaxy A06 / Android 16: **não validado**.
+
+### Integração
+- PRs #110/#114 foram usadas como referência de implementação, mas suas branches antigas/conflictantes não foram mescladas.
+- Esta fase será entregue em PR própria contra `main`; nenhuma mesclagem automática foi autorizada.
