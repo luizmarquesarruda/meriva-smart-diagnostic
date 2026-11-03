@@ -270,3 +270,10 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 - Verificar configurações, perfil do veículo, aprendizado e manutenção sem substituir arquivos corrompidos por defaults.
 - A Central de Saúde deve mostrar avisos de recuperação, corrupção, schema futuro ou falha do autosave.
 - Teste físico de persistência/recuperação no Galaxy A06: **não validado** até ensaio no aparelho.
+
+## CI-APK-ARTIFACT-01 — Publicação e download do APK de PR
+- Em evento `pull_request` para `main`, após `validate` e `android-build` aprovados, exigir upload do APK standalone e do arquivo `.sha256` como um único artefato.
+- Em push para `main`, manter a publicação do mesmo conjunto de arquivos.
+- O nome do artefato deve identificar evento e número da PR/execução; retenção esperada: 14 dias.
+- Confirmar que execução de PR disponibiliza artefato na página Actions e que o ZIP baixado contém `app-release.apk` e `app-release.apk.sha256`; verificar checksum após extração.
+- Upload em PR não pode executar merge, criar GitHub Release nem modificar `main`.
