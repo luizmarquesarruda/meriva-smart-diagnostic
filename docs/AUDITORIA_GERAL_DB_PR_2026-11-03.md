@@ -68,13 +68,13 @@ O GitHub retornou **108 PRs**:
 
 ### PR #109 — armazenamento, histórico e telemetria
 
-- Branch `fix/storage-and-history-integrity-20261031`, HEAD auditado após as correções: `fd591d8834208636c1f510ceca0310bdba29e34b`.
+- Branch `fix/storage-and-history-integrity-20261031`, HEAD auditado após as correções: `41912b2dc899d2b81dc111999a494eaa5e4af9f9`.
 - 48 arquivos alterados e 121 commits no metadado consultado.
 - **Conflito de integração:** `mergeable=false`; base anterior à main atual.
 - Revisão P1 identificou que `buildDriveCycle()` era chamado novamente em cada retry, gerando novo ID pelo horário de finalização. Corrigido com cache do ciclo associado à identidade do gravador; teste verifica que o mesmo objeto/ID é reutilizado e que outro gravador recebe ID novo.
 - Revisão P1 sobre spool CSV: o caminho atual usa arquivo temporário, read-back, validação e move para nome canônico apenas após validação. Foi acrescentado teste com falha simulada no read-back, ausência de temporário/segmento parcial e retry que grava exatamente uma linha.
 - O workflow não precisava de um job `baseline-gate` separado: o baseline já é um passo do job `validate`; o contrato existente foi preservado.
-- CI #4710 foi disparada para o HEAD corrigido e estava em execução na última consulta.
+- CI #4712 foi disparada para o HEAD corrigido e estava em execução na última consulta.
 
 ### PR #110 — integridade JSON, backup e benchmark
 
