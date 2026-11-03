@@ -1,6 +1,6 @@
 import { Link, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMidLayout } from '../src/ui/midLayout';
@@ -14,7 +14,7 @@ import { getDriveCycleSummary, type DriveCycle } from '../src/data/driveCycles';
 import { getAutoSaveState, getAutoSaveStatus, initAutoSave, updateAutoSaveState } from '../src/meriva/autosaveManager';
 import type { AutoSaveStatus } from '../src/meriva/autosaveManager';
 import type { ObdConnectionState } from '../src/meriva/autosaveState';
-import { ensureMerivaVehicleProfile } from '../src/database/vehicleConfig';
+import { ensureMerivaVehicleProfile, type VehicleProfile } from '../src/database/vehicleConfig';
 import { createLearningProfile, initializeCarScannerSeed, readLearningProfile } from '../src/database/learningProfile';
 import { readAppSettings, type AppSettings } from '../src/database/appSettings';
 import { connectPreferredElm, getSharedObdConnection, getSharedObdLastError, getSharedObdStatus, subscribeSharedObd, subscribeSharedObdStatus } from '../src/obd/sharedConnection';
@@ -34,6 +34,7 @@ export default function IndexScreen() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [tripState, setTripState] = useState<AutoTripServiceState>(autoTripService.getState());
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [vehicleProfile, setVehicleProfile] = useState<VehicleProfile | null>(null);
   const [activeQuadrantPage, setActiveQuadrantPage] = useState(0);
   const [conditions, setConditions] = useState<CurrentConditions>({ city: null, locationLabels: [], temperatureC: null, description: 'CLIMA OPCIONAL', available: false });
   const [locationLabelIndex, setLocationLabelIndex] = useState(0);
@@ -105,7 +106,8 @@ export default function IndexScreen() {
       const nextSettings = await readAppSettings(basePath);
       const restored = await initAutoSave(basePath);
       await initializeDriveCycles(basePath);
-      await ensureMerivaVehicleProfile(basePath);
+      const vehicle = await ensureMerivaVehicleProfile(basePath);
+      setVehicleProfile(vehicle);
       const learningProfile = await readLearningProfile(basePath);
       if (!learningProfile) await createLearningProfile(basePath, '2026-09-24T14:48:00.000Z');
       await initializeCarScannerSeed(basePath);
@@ -245,11 +247,13 @@ export default function IndexScreen() {
     ? getSharedObdConnection()?.supportedPids ?? []
     : [];
   const discoveredHeroMetrics = buildCockpitPidMetrics(connectedSupportedPids, liveReadings);
+  // Primary cockpit quadrants mirror the reference image, but values still
+  // pass through the real-response and freshness gates in cockpitTelemetry.
   const quadrantDefinitions = [
-    { pid: '0105', label: 'TEMPERATURA DO MOTOR', unit: '°C' },
-    { pid: '0142', label: 'VOLTAGEM DO SISTEMA', unit: 'V' },
-    { pid: '0111', label: 'POSIÇÃO DA BORBOLETA', unit: '%' },
     { pid: '010C', label: 'ROTAÇÃO DO MOTOR', unit: 'RPM' },
+    { pid: '010D', label: 'VELOCIDADE DO VEÍCULO', unit: 'km/h' },
+    { pid: '0105', label: 'TEMPERATURA DO MOTOR', unit: '°C' },
+    { pid: '012F', label: 'NÍVEL DE COMBUSTÍVEL', unit: '%' },
   ] as const;
   const discoveredByPid = new Map(discoveredHeroMetrics.map((metric) => [metric.pid, metric] as const));
   const normalizedSupportedPids = new Set(connectedSupportedPids.map((pid) => String(pid).replace(/\s/g, '').toUpperCase()));
@@ -343,6 +347,8 @@ export default function IndexScreen() {
               ? 'TOQUE PARA ABRIR A TELA DE CONEXÃO E TENTAR NOVAMENTE'
               : 'CONECTE O ELM327 PARA LER DADOS REAIS DO VEÍCULO';
 
+  const activeProtocolLabel = getSharedObdConnection()?.protocol ?? 'N/D';
+
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
       <StatusBar style="light" backgroundColor={COLORS.screen} />
@@ -351,25 +357,35 @@ export default function IndexScreen() {
           <View style={[styles.topSection, layout.landscape && styles.topSectionLandscape]}>
             <View style={[styles.header, layout.landscape && styles.headerLandscape]}>
               <View style={styles.headerTitle}>
-                <Text style={styles.brand} numberOfLines={1}>SMART OBD DIAGNOSTIC</Text>
-                <Text style={styles.subtitle} numberOfLines={1}>COCKPIT DE DIAGNÓSTICO</Text>
+                <Text style={styles.brand} numberOfLines={1}>MERIVA SMART</Text>
+                <Text style={styles.subtitle} numberOfLines={1}>DIAGNÓSTICO INTELIGENTE</Text>
               </View>
               <View style={styles.connectionPill}><View style={[styles.dot, connectionStatus.ecuConnected ? styles.dotOk : bluetoothError ? styles.dotDanger : styles.dotWarn]} /><Text style={styles.connectionText}>{connectionStatus.ecuConnected ? 'ECU OK' : connectionStatus.ecuResponseState === 'NO_RESPONSE' ? 'SEM RESPOSTA' : connectionStatus.ecuResponseState === 'RECOVERING' ? 'RECUPERANDO' : bluetoothSearching ? 'CONECTANDO' : connectionStatus.bluetoothConnected ? 'BT ATIVO' : bluetoothError ? 'FALHA' : 'SEM CONEXÃO'}</Text></View>
             </View>
             <View style={[styles.infoStrip, layout.landscape && styles.infoStripLandscape]}>
-              <View style={styles.weatherContent}>
-                <View style={[styles.weatherIconWrap, layout.landscape && styles.weatherIconWrapLandscape]}>
-                  <AppIcon name="weather" size={24} color={COLORS.accent} />
-                </View>
-                <View style={styles.weatherDetails}>
-                  <Text style={[styles.weatherCity, layout.landscape && styles.weatherCityLandscape]} numberOfLines={layout.landscape ? 1 : 2}>
-                    {(locationLabels[locationLabelIndex % locationLabels.length] ?? 'CLIMA LOCAL').toLocaleUpperCase('pt-BR')}
+              <View style={styles.vehicleInfoContent}>
+                <Image
+                  source={require('../assets/meriva-smart-vehicle-banner.jpg')}
+                  style={[styles.vehicleInfoImage, layout.landscape && styles.vehicleInfoImageLandscape]}
+                  resizeMode="cover"
+                  accessibilityLabel="Ilustração do Chevrolet Meriva"
+                />
+                <View style={styles.vehicleInfoCopy}>
+                  <Text style={styles.vehicleName} numberOfLines={1}>
+                    {vehicleProfile ? (vehicleProfile.make + ' ' + vehicleProfile.model).toLocaleUpperCase('pt-BR') : 'CHEVROLET MERIVA'}
                   </Text>
-                  <View style={styles.weatherMeta}>
-                    <Text style={[styles.weatherTemperature, layout.landscape && styles.weatherTemperatureLandscape]} numberOfLines={1}>
+                  <Text style={styles.vehicleSpec} numberOfLines={1}>
+                    {[vehicleProfile?.engine, vehicleProfile?.year ? String(vehicleProfile.year) : null].filter(Boolean).join(' • ') || 'PERFIL DO VEÍCULO'}
+                  </Text>
+                  <View style={styles.vehicleWeatherRow}>
+                    <AppIcon name="weather" size={15} color={COLORS.accent} />
+                    <Text style={[styles.weatherCity, styles.vehicleWeatherCity]} numberOfLines={1}>
+                      {(locationLabels[locationLabelIndex % locationLabels.length] ?? 'CLIMA LOCAL').toLocaleUpperCase('pt-BR')}
+                    </Text>
+                    <Text style={[styles.weatherTemperature, styles.vehicleWeatherTemperature]} numberOfLines={1}>
                       {conditions.temperatureC != null ? Math.round(conditions.temperatureC) + '°' : 'N/D'}
                     </Text>
-                    <Text style={[styles.weatherDescription, layout.landscape && styles.weatherDescriptionLandscape]} numberOfLines={2}>
+                    <Text style={[styles.weatherDescription, styles.vehicleWeatherDescription]} numberOfLines={1}>
                       {conditions.description || 'CONDIÇÃO INDISPONÍVEL'}
                     </Text>
                   </View>
@@ -439,6 +455,13 @@ export default function IndexScreen() {
                     metric.severity === 'warning' && styles.quadrantCardWarning,
                   ]}
                 >
+                  <View style={[styles.quadrantMetricIcon, layout.landscape && styles.quadrantMetricIconLandscape]}>
+                    <AppIcon
+                      name={metric.pid === '010C' ? 'rpm' : metric.pid === '010D' ? 'speed' : metric.pid === '0105' ? 'coolant' : metric.pid === '012F' ? 'fuel' : 'diagnostic'}
+                      size={layout.landscape ? 21 : 27}
+                      color={metric.pid === '010C' ? COLORS.rpmAccent : metric.pid === '010D' ? COLORS.speedAccent : metric.pid === '0105' ? COLORS.temperatureAccent : metric.pid === '012F' ? COLORS.fuelAccent : COLORS.accent}
+                    />
+                  </View>
                   <Text style={[styles.quadrantLabel, layout.landscape && styles.quadrantLabelLandscape]} numberOfLines={layout.landscape ? 1 : 2}>{metric.label}</Text>
                   <View style={[styles.quadrantValueRow, layout.landscape && styles.quadrantValueRowLandscape]}>
                     <Text style={[
@@ -476,19 +499,40 @@ export default function IndexScreen() {
               accessibilityHint="Abre o adaptador ELM327 e a validação da ECU"
               activeOpacity={0.78}
             >
-              <View style={[styles.sessionIconWrap, connectionStatus.ecuConnected && styles.sessionIconWrapOk]}>
-                <AppIcon
-                  name={connectionStatus.ecuConnected ? 'check' : bluetoothError ? 'warning' : 'bluetooth'}
-                  size={22}
-                  color={connectionStatus.ecuConnected ? COLORS.success : bluetoothError ? COLORS.danger : COLORS.accent}
-                />
+              <View style={styles.sessionSummary}>
+                <View style={[styles.sessionIconWrap, connectionStatus.ecuConnected && styles.sessionIconWrapOk]}>
+                  <AppIcon
+                    name={connectionStatus.ecuConnected ? 'check' : bluetoothError ? 'warning' : 'bluetooth'}
+                    size={22}
+                    color={connectionStatus.ecuConnected ? COLORS.success : bluetoothError ? COLORS.danger : COLORS.accent}
+                  />
+                </View>
+                <View style={[styles.sessionCopy, layout.landscape && styles.sessionCopyLandscape]}>
+                  <Text style={styles.sessionTitle}>STATUS DA ECU</Text>
+                  <Text style={styles.sessionHeadline} numberOfLines={2}>{connectionLabel}</Text>
+                  <Text style={styles.sessionDetail} numberOfLines={2}>{obdSessionDetail}</Text>
+                </View>
+                {!layout.landscape && <AppIcon name="arrowRight" size={18} color={COLORS.textSubtle} />}
               </View>
-              <View style={[styles.sessionCopy, layout.landscape && styles.sessionCopyLandscape]}>
-                <Text style={styles.sessionTitle}>SESSÃO DE DIAGNÓSTICO</Text>
-                <Text style={styles.sessionHeadline} numberOfLines={2}>{connectionLabel}</Text>
-                <Text style={styles.sessionDetail} numberOfLines={2}>{obdSessionDetail}</Text>
+              <View style={[styles.sessionMetaRow, layout.landscape && styles.sessionMetaRowLandscape]}>
+                <View style={styles.sessionMetaCell}>
+                  <AppIcon name="bluetooth" size={14} color={connectionStatus.bluetoothConnected ? COLORS.success : COLORS.textMuted} />
+                  <View>
+                    <Text style={styles.sessionMetaLabel}>BLUETOOTH</Text>
+                    <Text style={[styles.sessionMetaValue, connectionStatus.bluetoothConnected && styles.sessionMetaValueOk]}>
+                      {connectionStatus.bluetoothConnected ? 'CONECTADO' : 'DESCONECTADO'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={[styles.sessionDivider, layout.landscape && styles.sessionDividerLandscape]} />
+                <View style={styles.sessionMetaCell}>
+                  <AppIcon name="network" size={14} color={COLORS.accent} />
+                  <View>
+                    <Text style={styles.sessionMetaLabel}>PROTOCOLO</Text>
+                    <Text style={styles.sessionMetaValue} numberOfLines={1}>{activeProtocolLabel}</Text>
+                  </View>
+                </View>
               </View>
-              {!layout.landscape && <AppIcon name="arrowRight" size={18} color={COLORS.textSubtle} />}
             </TouchableOpacity>
           </Link>
           </View>
@@ -518,13 +562,13 @@ function CockpitMetric({ label, value, compact = false }: { label: string; value
 
 const styles = StyleSheet.create({
   container:{flex:1,backgroundColor:COLORS.screen},content:{flex:1,width:'100%',paddingVertical:6,paddingBottom:6},screenFrame:{width:'100%',flex:1,alignSelf:'center'},screenFrameLandscape:{paddingRight:56},topSection:{marginBottom:8},topSectionLandscape:{flexDirection:'row',alignItems:'stretch',gap:8,marginBottom:5},mainContent:{width:'100%',flexDirection:'column',minWidth:0},mainContentLandscape:{flex:1,flexDirection:'row',alignItems:'stretch',gap:8,minHeight:0},layoutSpacer:{flexGrow:1,minHeight:8},layoutSpacerLandscape:{flexGrow:0,minHeight:0,height:4},
-  infoStrip:{minHeight:88,flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:10,paddingVertical:8,backgroundColor:COLORS.surface,borderRadius:13,borderWidth:1,borderColor:COLORS.border},infoStripLandscape:{flex:1,minWidth:0,minHeight:54,paddingHorizontal:8,paddingVertical:4,gap:6},
+  infoStrip:{minHeight:88,flexDirection:'row',alignItems:'center',gap:9,paddingHorizontal:10,paddingVertical:8,backgroundColor:COLORS.surface,borderRadius:13,borderWidth:1,borderColor:COLORS.metricBorder},infoStripLandscape:{flex:1,minWidth:0,minHeight:54,paddingHorizontal:8,paddingVertical:4,gap:6},vehicleInfoContent:{flex:1,minWidth:0,flexDirection:'row',alignItems:'center',gap:9},vehicleInfoImage:{width:86,height:64,borderRadius:10,borderWidth:1,borderColor:COLORS.metricBorder},vehicleInfoImageLandscape:{width:66,height:44,borderRadius:8},vehicleInfoCopy:{flex:1,minWidth:0,gap:4},vehicleName:{color:COLORS.textStrong,fontSize:12,fontWeight:'900',letterSpacing:.25},vehicleSpec:{color:COLORS.textMuted,fontSize:9,fontWeight:'800'},vehicleWeatherRow:{flexDirection:'row',alignItems:'center',gap:4,minWidth:0},vehicleWeatherCity:{flexShrink:1,fontSize:10,lineHeight:12,letterSpacing:0},vehicleWeatherTemperature:{fontSize:14,lineHeight:16,marginTop:0},vehicleWeatherDescription:{flexShrink:1,fontSize:8,lineHeight:10},
   weatherContent:{flex:1,minWidth:0,flexDirection:'row',alignItems:'center',gap:9},weatherIconWrap:{width:42,height:42,borderRadius:12,alignItems:'center',justifyContent:'center',backgroundColor:COLORS.surfaceInset,borderWidth:1,borderColor:COLORS.border},weatherIconWrapLandscape:{width:34,height:34,borderRadius:10},weatherDetails:{flex:1,minWidth:0,gap:2},weatherCity:{color:COLORS.textStrong,fontSize:15,lineHeight:18,fontWeight:'900',letterSpacing:.35},weatherCityLandscape:{fontSize:13,lineHeight:15},weatherMeta:{flexDirection:'row',alignItems:'center',gap:8,flexWrap:'wrap'},weatherTemperature:{color:COLORS.textStrong,fontSize:24,lineHeight:28,fontWeight:'900',fontVariant:['tabular-nums']},weatherTemperatureLandscape:{fontSize:20,lineHeight:23},weatherDescription:{flexShrink:1,color:COLORS.textMuted,fontSize:12,lineHeight:16,fontWeight:'800'},weatherDescriptionLandscape:{fontSize:10,lineHeight:13},
   
   networkChip:{minHeight:64,minWidth:96,maxWidth:112,alignItems:'stretch',justifyContent:'center',paddingHorizontal:7,paddingVertical:6,backgroundColor:COLORS.surfaceInset,borderRadius:11,borderWidth:1,borderColor:COLORS.border},networkChipLandscape:{minHeight:50,minWidth:82,maxWidth:92,paddingHorizontal:5,paddingVertical:4},
-  header:{backgroundColor:COLORS.surface,borderRadius:16,borderWidth:1,borderColor:COLORS.border,padding:14,marginBottom:8,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},headerLandscape:{flex:0.9,minWidth:0,paddingVertical:8,paddingHorizontal:10,marginBottom:0},headerTitle:{flex:1,minWidth:0},brand:{color:COLORS.textStrong,fontSize:18,fontWeight:'900',letterSpacing:1.2},subtitle:{color:COLORS.accent,fontSize:9,fontWeight:'900',letterSpacing:1,marginTop:3},
+  header:{backgroundColor:COLORS.surface,borderRadius:16,borderWidth:1,borderColor:COLORS.border,padding:14,marginBottom:8,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},headerLandscape:{flex:0.9,minWidth:0,paddingVertical:8,paddingHorizontal:10,marginBottom:0},headerTitle:{flex:1,minWidth:0},brand:{color:COLORS.textStrong,fontSize:20,fontWeight:'900',letterSpacing:1.5},subtitle:{color:COLORS.brandCyan,fontSize:9,fontWeight:'900',letterSpacing:1,marginTop:3},
   connectionPill:{flexDirection:'row',alignItems:'center',gap:6,flexShrink:0,backgroundColor:'#091526',borderRadius:20,borderWidth:1,borderColor:COLORS.border,paddingHorizontal:10,paddingVertical:7},dot:{width:8,height:8,borderRadius:4},dotOk:{backgroundColor:COLORS.success},dotWarn:{backgroundColor:COLORS.warning},dotDanger:{backgroundColor:COLORS.danger},connectionText:{color:'#dbeafe',fontSize:9,fontWeight:'900'},
-  heroCard:{backgroundColor:'#0f2035',borderRadius:18,borderWidth:1,borderColor:COLORS.border,padding:12,alignItems:'center',marginBottom:8},heroCardWarning:{borderColor:COLORS.warning,backgroundColor:'#2a2412'},heroCardDanger:{borderColor:COLORS.danger,backgroundColor:'#2b1420'},heroCardLandscape:{flex:1,minWidth:0,padding:6,marginBottom:0,justifyContent:'center'},heroReadout:{width:'100%',alignItems:'center',paddingVertical:1},heroEyebrow:{color:COLORS.accent,fontSize:10,fontWeight:'900',letterSpacing:1.4,textAlign:'center'},heroNumberRow:{flexDirection:'row',alignItems:'baseline',justifyContent:'center',gap:6},heroUnit:{color:'#a9c8ef',fontSize:18,fontWeight:'900'},heroSwitchHintRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:4,marginTop:4},heroSwitchHint:{color:'#6884a6',fontSize:8,fontWeight:'900',letterSpacing:.6},heroWarning:{color:COLORS.warning},heroValue:{color:COLORS.textStrong,fontSize:50,lineHeight:56,fontWeight:'900',marginTop:2,fontVariant:['tabular-nums']},heroValueLandscape:{fontSize:36,lineHeight:40,marginTop:0},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5,textAlign:'center'},
+  heroCard:{backgroundColor:COLORS.heroSurface,borderRadius:18,borderWidth:1,borderColor:COLORS.metricBorder,padding:12,alignItems:'center',marginBottom:8},heroCardWarning:{borderColor:COLORS.warning,backgroundColor:'#2a2412'},heroCardDanger:{borderColor:COLORS.danger,backgroundColor:'#2b1420'},heroCardLandscape:{flex:1,minWidth:0,padding:6,marginBottom:0,justifyContent:'center'},heroReadout:{width:'100%',alignItems:'center',paddingVertical:1},heroEyebrow:{color:COLORS.accent,fontSize:10,fontWeight:'900',letterSpacing:1.4,textAlign:'center'},heroNumberRow:{flexDirection:'row',alignItems:'baseline',justifyContent:'center',gap:6},heroUnit:{color:'#a9c8ef',fontSize:18,fontWeight:'900'},heroSwitchHintRow:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:4,marginTop:4},heroSwitchHint:{color:'#6884a6',fontSize:8,fontWeight:'900',letterSpacing:.6},heroWarning:{color:COLORS.warning},heroValue:{color:COLORS.textStrong,fontSize:50,lineHeight:56,fontWeight:'900',marginTop:2,fontVariant:['tabular-nums']},heroValueLandscape:{fontSize:36,lineHeight:40,marginTop:0},heroState:{color:'#8fa6c1',fontSize:9,fontWeight:'800',letterSpacing:.5,textAlign:'center'},
   metricRow:{width:'100%',flexDirection:'row',gap:6,marginTop:10},metricRowLandscape:{marginTop:3,gap:4},cockpitMetric:{flex:1,minWidth:0,backgroundColor:COLORS.surfaceInset,borderRadius:11,borderWidth:1,borderColor:COLORS.border,paddingVertical:9,paddingHorizontal:5,alignItems:'center'},cockpitMetricCompact:{paddingVertical:3,paddingHorizontal:3,borderRadius:8},metricLabel:{color:'#9aacc4',fontSize:8,fontWeight:'900',letterSpacing:.3,textAlign:'center'},metricLabelCompact:{fontSize:8,letterSpacing:0,lineHeight:10},metricValue:{color:COLORS.text,fontSize:12,fontWeight:'900',marginTop:3,textAlign:'center'},metricValueCompact:{fontSize:11,marginTop:1},
   quadrantHeader:{width:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:10},quadrantHeaderLandscape:{marginBottom:4},
   quadrantHeaderCopy:{flex:1,minWidth:0},
@@ -538,19 +582,19 @@ const styles = StyleSheet.create({
   quadrantPageText:{color:'#a9c8ef',fontSize:9,fontWeight:'900'},
   quadrantGrid:{width:'100%',flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',gap:8},
   quadrantGridLandscape:{gap:5},
-  quadrantCard:{width:'48%',minHeight:91,paddingVertical:10,paddingHorizontal:9,backgroundColor:COLORS.surfaceInset,borderRadius:12,borderWidth:1,borderColor:COLORS.border},
-  quadrantCardLandscape:{minHeight:54,paddingVertical:4,paddingHorizontal:6},
+  quadrantCard:{width:'48%',minHeight:100,paddingVertical:8,paddingHorizontal:9,backgroundColor:COLORS.metricSurface,borderRadius:13,borderWidth:1.5,borderColor:COLORS.metricBorder,alignItems:'center',justifyContent:'center'},
+  quadrantCardLandscape:{minHeight:62,paddingVertical:4,paddingHorizontal:6},quadrantMetricIcon:{alignItems:'center',justifyContent:'center',marginBottom:4},quadrantMetricIconLandscape:{marginBottom:1},
   quadrantCardWarning:{borderColor:COLORS.warning,backgroundColor:'#2a2412'},
   quadrantCardDanger:{borderColor:COLORS.danger,backgroundColor:'#2b1420'},
-  quadrantLabel:{color:'#9fb7d5',fontSize:8,fontWeight:'900',letterSpacing:.4},quadrantLabelLandscape:{fontSize:8,lineHeight:9,letterSpacing:0},
+  quadrantLabel:{color:'#c5e8ff',fontSize:9,fontWeight:'900',letterSpacing:.35,textAlign:'center'},quadrantLabelLandscape:{fontSize:8,lineHeight:9,letterSpacing:0},
   quadrantValueRow:{flexDirection:'row',alignItems:'baseline',gap:4,marginTop:5},quadrantValueRowLandscape:{marginTop:2,gap:3},
-  quadrantValue:{color:COLORS.textStrong,fontSize:25,lineHeight:29,fontWeight:'900',fontVariant:['tabular-nums']},quadrantValueLandscape:{fontSize:21,lineHeight:22},
+  quadrantValue:{color:COLORS.textStrong,fontSize:29,lineHeight:33,fontWeight:'900',fontVariant:['tabular-nums']},quadrantValueLandscape:{fontSize:22,lineHeight:23},
   quadrantUnit:{color:'#a9c8ef',fontSize:10,fontWeight:'900'},
-  quadrantHint:{color:'#6884a6',fontSize:7,fontWeight:'800',marginTop:3},quadrantHintLandscape:{fontSize:8,lineHeight:9,marginTop:1},
+  quadrantHint:{color:COLORS.textMuted,fontSize:7.5,fontWeight:'800',marginTop:3,textAlign:'center'},quadrantHintLandscape:{fontSize:7,lineHeight:8,marginTop:1},
   quadrantInstruction:{color:COLORS.textSubtle,fontSize:8,fontWeight:'900',letterSpacing:.2,textAlign:'center',marginTop:7,lineHeight:12},quadrantInstructionLandscape:{fontSize:8,lineHeight:10,letterSpacing:0,marginTop:3},
   coolantCard:{width:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12,marginTop:9,paddingHorizontal:13,paddingVertical:11,backgroundColor:COLORS.surfaceInset,borderRadius:12,borderWidth:1,borderColor:COLORS.border},coolantCardLandscape:{marginTop:4,paddingVertical:5,paddingHorizontal:9},coolantCopy:{flex:1,minWidth:0},coolantHeading:{flexDirection:'row',alignItems:'center',gap:5},coolantLabel:{color:'#c5d8f2',fontSize:9,fontWeight:'900',letterSpacing:.4},coolantStatus:{color:COLORS.textSubtle,fontSize:8,fontWeight:'800',marginTop:4},coolantValue:{fontSize:23,fontWeight:'900',fontVariant:['tabular-nums']},coolantOk:{color:COLORS.success},coolantWarning:{color:COLORS.warning},coolantUnavailable:{color:'#8fa6c1'},
   danger:{color:COLORS.danger},
-  sessionCard:{minHeight:68,flexDirection:'row',alignItems:'center',gap:10,paddingHorizontal:12,paddingVertical:10,backgroundColor:COLORS.surface,borderRadius:13,borderWidth:1,borderColor:COLORS.border,marginBottom:8},sessionCardLandscape:{width:166,flexGrow:0,flexShrink:0,minHeight:56,alignSelf:'stretch',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5,paddingHorizontal:8,paddingVertical:7,marginBottom:0},sessionIconWrap:{width:36,height:36,borderRadius:11,alignItems:'center',justifyContent:'center',backgroundColor:COLORS.surfaceInset,borderWidth:1,borderColor:COLORS.border},sessionIconWrapOk:{borderColor:COLORS.successBorder,backgroundColor:'#10261b'},sessionCopy:{flex:1,minWidth:0,gap:2},sessionCopyLandscape:{flex:0,width:'100%',alignItems:'center'},sessionTitle:{color:COLORS.accent,fontSize:8,fontWeight:'900',letterSpacing:.7},sessionHeadline:{color:COLORS.text,fontSize:10,fontWeight:'900'},sessionDetail:{color:'#8fa6c1',fontSize:8,lineHeight:12,textAlign:'center'},
+  sessionCard:{minHeight:96,flexDirection:'column',alignItems:'stretch',gap:8,paddingHorizontal:12,paddingVertical:9,backgroundColor:COLORS.surface,borderRadius:13,borderWidth:1,borderColor:COLORS.metricBorder,marginBottom:8},sessionCardLandscape:{width:166,flexGrow:0,flexShrink:0,minHeight:86,alignSelf:'stretch',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5,paddingHorizontal:8,paddingVertical:7,marginBottom:0},sessionSummary:{width:'100%',flexDirection:'row',alignItems:'center',gap:10},sessionIconWrap:{width:36,height:36,borderRadius:11,alignItems:'center',justifyContent:'center',backgroundColor:COLORS.surfaceInset,borderWidth:1,borderColor:COLORS.border},sessionIconWrapOk:{borderColor:COLORS.successBorder,backgroundColor:'#10261b'},sessionCopy:{flex:1,minWidth:0,gap:2},sessionCopyLandscape:{flex:0,width:'100%',alignItems:'center'},sessionTitle:{color:COLORS.brandCyan,fontSize:8,fontWeight:'900',letterSpacing:.7},sessionHeadline:{color:COLORS.text,fontSize:10,fontWeight:'900'},sessionDetail:{color:'#8fa6c1',fontSize:8,lineHeight:12,textAlign:'center'},sessionMetaRow:{width:'100%',flexDirection:'row',alignItems:'center',justifyContent:'space-around',paddingTop:7,borderTopWidth:1,borderTopColor:COLORS.borderSubtle,gap:6},sessionMetaRowLandscape:{flexDirection:'column',alignItems:'flex-start',justifyContent:'flex-start',paddingTop:4,gap:4},sessionMetaCell:{flex:1,minWidth:0,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6},sessionMetaLabel:{color:COLORS.textSubtle,fontSize:7,fontWeight:'900',letterSpacing:.35},sessionMetaValue:{color:COLORS.textStrong,fontSize:8,fontWeight:'900',marginTop:1},sessionMetaValueOk:{color:COLORS.success},sessionDivider:{width:1,height:25,backgroundColor:COLORS.borderSubtle},sessionDividerLandscape:{display:'none'},
   connectionCard:{backgroundColor:COLORS.surface,borderRadius:15,borderWidth:1,borderColor:COLORS.border,padding:14,marginBottom:10},chain:{flexDirection:'row',alignItems:'center',marginTop:10},chainStep:{flex:1,alignItems:'center'},chainCircle:{width:30,height:30,borderRadius:15,alignItems:'center',justifyContent:'center',borderWidth:1,borderColor:COLORS.border,backgroundColor:'#0a1727'},chainCircleOk:{borderColor:COLORS.successBorder,backgroundColor:'#10261b'},chainCircleText:{color:COLORS.textSubtle,fontSize:11,fontWeight:'900'},chainCircleTextOk:{color:COLORS.success},chainLabel:{color:COLORS.textMuted,fontSize:8,fontWeight:'900',marginTop:4},chainArrow:{color:'#526a86',fontSize:24,paddingHorizontal:4},
   
   statusGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',marginBottom:2},statusGridLandscape:{flexWrap:'nowrap',gap:8},statusCardLandscape:{width:'auto',flex:1},statusCard:{width:'48%',minWidth:0,backgroundColor:COLORS.surface,borderRadius:12,borderWidth:1,borderColor:COLORS.border,padding:11,marginBottom:8},moreButton:{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:COLORS.surface,borderRadius:14,borderWidth:1,borderColor:COLORS.border,padding:13,marginTop:2},moreIcon:{color:COLORS.accent,fontSize:24,fontWeight:'900'},moreBody:{flex:1,minWidth:0},moreTitle:{color:COLORS.text,fontSize:11,fontWeight:'900'},moreHint:{color:COLORS.textSubtle,fontSize:8,marginTop:3,flexShrink:1},moreArrow:{color:COLORS.accent,fontSize:24},

@@ -111,4 +111,16 @@ assert.equal((index.match(/hitSlop=\{4\}/g) ?? []).length, 5, 'as cinco abas dev
 assert.equal((index.match(/hitSlop=\{\{ top: 8, bottom: 8, left: 9, right: 9 \}\}/g) ?? []).length, 2, 'os dois controles de paginação devem atingir alvo de toque próximo de 48dp');
 assert.match(index, /footerStatus:\{color:COLORS\.textSubtle/, 'o rodapé do cockpit deve usar o token de texto com contraste revisado');
 
+const coreQuadrantDefinitions = index.slice(index.indexOf('const quadrantDefinitions'), index.indexOf('const discoveredByPid'));
+const expectedCorePids = ['010C', '010D', '0105', '012F'];
+const actualCorePids = [...coreQuadrantDefinitions.matchAll(/pid: '([0-9A-F]{4})'/g)].map((match) => match[1]);
+assert.deepEqual(actualCorePids, expectedCorePids, 'cockpit deve priorizar RPM, velocidade, temperatura e combustível');
+assert.match(index, /meriva-smart-vehicle-banner\.jpg/, 'cockpit deve usar a arte de veículo da referência');
+assert.match(index, /vehicleProfile\?\.engine/, 'descrição do veículo deve vir do perfil configurado, não de texto fixo');
+assert.match(index, /metric\.pid === '012F'.*?COLORS\.fuelAccent/, 'ícone de combustível deve usar token visual semântico');
+assert.doesNotMatch(index, /\b(?:720|740)\s*(?:rpm)?\b|\b(?:88|90)\s*°C\b/i, 'valores demonstrativos da imagem não podem virar leituras reais');
+const theme = read('src/ui/theme.ts');
+for (const token of ['heroSurface', 'metricSurface', 'metricBorder', 'brandCyan', 'rpmAccent', 'speedAccent', 'temperatureAccent', 'fuelAccent']) {
+  assert.match(theme, new RegExp('\\b' + token + ':'));
+}
 console.log('Cockpit e telas secundárias: OK');

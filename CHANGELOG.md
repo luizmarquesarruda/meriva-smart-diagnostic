@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Cockpit MERIVA SMART baseado na referência visual
+- Atualizado o cabeçalho para MERIVA SMART e incorporada a arte ilustrativa do veículo ao cartão superior, usando o perfil local configurado para nome, motorização e ano.
+- Reorganizados os quatro quadrantes principais para RPM (010C), velocidade (010D), temperatura (0105) e nível de combustível (012F), com ícones e destaques azul/ciano, mantendo a validação de resposta real e frescor dos dados.
+- Reforçado o painel de estado da ECU com estado Bluetooth e protocolo efetivamente observados; mantidos consumo, autonomia, pressão do coletor, clima, conectividade e as cinco abas.
+- Nenhum valor fictício da imagem foi incorporado à telemetria. Leituras ausentes, vencidas ou não anunciadas permanecem como N/D.
+- A inspeção visual física, teste ELM327/ECU e validação CI/build ainda precisam ser concluídos no SHA final.
+
 ### Layout e consistência visual
 - Centralizadas as bordas dos componentes no tema compartilhado; o token principal oferece contraste mínimo de 3:1 sobre as superfícies do aplicativo.
 - Padronizadas bordas de cartões, controles e estados de conexão, preservando fundos, identidade azul/teal e cores funcionais dos dados.

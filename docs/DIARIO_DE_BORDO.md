@@ -10,7 +10,7 @@
 - Validação PR #104: `validate` e `android-build` passaram no SHA `2cdbda3807a50e68cd1fe24fe3ff207dc125dbfd`.
 - A CI também passou no push da `main` após a integração da PR #105, SHA `b128b413427e612e621dc2ef2c82b6c2476ce659`. O push de main após o merge da #104 está em execução e deve ser consultado no SHA final correspondente.
 - O repositório permanece público. PR #108 foi integrada por squash em `24651428eb4dff69ad3086627e739df07c1de4dd`: o upload do APK passou a ocorrer apenas em push para `main`, com retenção de 14 dias; não cria GitHub Release nem publica em branches/PRs.
-- O índice e os títulos do Diário estão alinhados até DB-196; DB-195 registra a divergência visual do APK instalado e DB-196 registra a auditoria de contraste/paleta e a padronização das bordas.
+- O índice e os títulos do Diário estão alinhados até DB-197; DB-195 registra a divergência visual do APK instalado, DB-196 a auditoria da paleta e DB-197 a adaptação do cockpit à referência visual.
 - Não declarar inspeção visual ou teste físico no Galaxy A06 / SM-A065M / Android 16. Permanecem necessários screenshots em retrato/paisagem e teste ELM327/ECU real, incluindo respostas 010C/012F.
 - A execução CI da PR #108 (run `41205305161`, HEAD `83f702bd7d5247e53f5291f7806477ecdcf3e981`) aprovou `validate` e `android-build`; o upload foi corretamente ignorado por ser evento de PR. O push subsequente na `main` precisa concluir e publicar o artefato do SHA atual antes de enviar novo link de APK.
 
@@ -287,6 +287,7 @@
 - **DB-194** · 2026-10-31 — Auditoria estática do layout no Galaxy A06 / Android 16
 - **DB-195** · 2026-11-02 — Divergência visual do APK instalado e rastreabilidade da publicação
 - **DB-196** · 2026-11-02 — Auditoria da paleta e contraste das bordas do layout
+- **DB-197** · 2026-11-02 — Adaptar cockpit à referência visual MERIVA SMART sem simular telemetria
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -5039,3 +5040,19 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - A busca não encontrou arquivo, diretório ou alias `@/pantone`; não foi inventada uma especificação Pantone oficial. O tema existente permanece a fonte de cores do app.
 - Fonte ampliada/zoom do One UI continuam pendentes de inspeção visual no Galaxy A06. Esta mudança não declara validação física, screenshot ou teste de toque concluído.
 - A CI deve validar baseline, TypeScript, testes e build Android no SHA final da PR.
+
+
+## DB-197 · 2026-11-02 — Adaptar cockpit à referência visual MERIVA SMART sem simular telemetria
+
+### Alterações aplicadas
+- A tela inicial foi aproximada da referência visual: marca MERIVA SMART, faixa superior com ilustração do Meriva, fundo azul-marinho, bordas ciano e quatro cartões métricos com ícones e hierarquia visual ampliada.
+- O veículo, motorização e ano exibidos no cartão são lidos do perfil local existente; foi adicionada somente uma arte ilustrativa recortada do veículo em `assets/meriva-smart-vehicle-banner.jpg`.
+- Os quatro quadrantes principais passaram a priorizar RPM (010C), velocidade (010D), temperatura do motor (0105) e nível de combustível (012F).
+- O painel de estado passou a exibir Bluetooth e protocolo efetivamente observados pela sessão OBD.
+- Foram mantidos a verificação de origem REAL, a janela de validade das leituras, o estado N/D para leituras ausentes/vencidas, os cartões de consumo/autonomia/pressão, clima/rede e as cinco abas de navegação.
+
+### Limites e não regressão
+- Nenhum valor fictício do mockup foi incorporado ao código ou à telemetria.
+- Sem alteração no transporte Bluetooth Classic, inicialização ELM327, gate da ECU, comandos OBD, polling, fórmulas de consumo/autonomia, GPS, SQLite, histórico ou persistência.
+- O banner é arte ilustrativa e não uma captura do veículo em tempo real. O protocolo só é exibido quando a sessão fornece esse valor.
+- CI, TypeScript, testes, build Android, inspeção visual em retrato/paisagem e teste físico ELM327/ECU ainda precisam ser confirmados no SHA final.
