@@ -9,6 +9,7 @@ const sourcePath = path.resolve(__dirname, '../src/database/csvLogger.ts');
 const files = new Map();
 const directories = new Set(['/base', '/base/LOGS']);
 const unreadableDirectories = new Set();
+let failNextSpoolReadBack = false;
 
 function info(filePath) {
   const isDirectory = directories.has(filePath);
@@ -42,6 +43,10 @@ const fakeFileSystem = {
     files.set(filePath, String(value));
   },
   async readAsStringAsync(filePath) {
+    if (failNextSpoolReadBack && filePath.includes('.tmp-')) {
+      failNextSpoolReadBack = false;
+      throw new Error('SPOOL_READBACK_FAILURE: ' + filePath);
+    }
     if (!files.has(filePath)) throw new Error('FILE_NOT_FOUND: ' + filePath);
     return files.get(filePath);
   },
@@ -188,6 +193,38 @@ async function main() {
       'no committed segment may exceed the byte limit');
   }
   assert.ok(files.get(rotatedSegments[1]).includes('after-limit'));
+
+  // A temporary segment whose read-back fails must be removed before retry.
+  const readbackPath = '/base/LOGS/obd_raw_2026-11-01_readback.csv';
+  const readbackHeader = 'timestamp,eventId,pid\\n';
+  const existingRow = '2026-11-01T09:00:00.000Z,existing,010C\\n';
+  const fillerBytes = logger.MAX_CSV_SEGMENT_BYTES
+    - Buffer.byteLength(readbackHeader + existingRow, 'utf8') - 4;
+  const readbackOriginal = readbackHeader + existingRow + 'x'.repeat(fillerBytes);
+  files.set(readbackPath, readbackOriginal);
+  failNextSpoolReadBack = true;
+  await assert.rejects(
+    restartedLogger.appendCsvRowIfMissing(
+      readbackPath,
+      { timestamp: '2026-11-01T10:00:00.011Z', eventId: 'readback-retry', pid: '010C' },
+      'eventId',
+    ),
+    /SPOOL_READBACK_FAILURE/,
+  );
+  assert.deepEqual(
+    Array.from(files.keys()).filter((item) => item.startsWith(readbackPath)),
+    [readbackPath],
+    'falha no read-back deve remover o temporário e não publicar segmento incompleto',
+  );
+  await restartedLogger.appendCsvRowIfMissing(
+    readbackPath,
+    { timestamp: '2026-11-01T10:00:00.011Z', eventId: 'readback-retry', pid: '010C' },
+    'eventId',
+  );
+  const readbackSegments = await restartedLogger.getCsvLogSegments(readbackPath);
+  const readbackRows = readbackSegments.flatMap((segment) => parseCsv(files.get(segment)).slice(1));
+  assert.equal(readbackRows.filter((record) => record[1] === 'readback-retry').length, 1,
+    'retry após falha de read-back deve persistir a linha exatamente uma vez');
 
   // Pre-upgrade .queue-* files remain visible and participate in ID deduplication.
   const legacyQueuePath = '/base/LOGS/obd_raw_2026-11-01.queue-1793520000000-000001.csv';
