@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CSV: testa falhas de read-back e escrita parcial do spool, limpeza de temporários e retry do lote de overflow sem perda ou duplicação.
+
 - Viagens: reutiliza o mesmo ID/ciclo finalizado quando a gravação precisa de retry; impede que a tentativa repetida conte a mesma viagem duas vezes na autonomia.
 
 - CI/Android: publica o APK standalone e SHA-256 em `main` e em PRs originadas no próprio repositório; PRs de forks não publicam artefatos. Retenção de 14 dias, sem Release automática.
