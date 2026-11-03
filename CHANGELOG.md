@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased — Artefato APK em PRs
-- CI agora publica o APK standalone e o SHA-256 também em execuções de pull request, além da branch main.
+- CI agora publica o APK standalone e o SHA-256 em toda execução bem-sucedida do job Android, incluindo push em branches de PR, pull_request, main e execução manual.
 - O nome do artefato identifica o evento e o número da PR/execução; retenção configurada em 14 dias.
 - A publicação não faz merge, não cria GitHub Release e não altera a branch main.
 
