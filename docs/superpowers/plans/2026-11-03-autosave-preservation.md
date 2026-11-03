@@ -4,7 +4,7 @@
 
 **Goal:** Impedir que o autosave substitua um JSON principal ou uma cópia anterior corrompida, inválida ou criada por schema futuro.
 
-**Architecture:** Manter a leitura tolerante para recuperar o último envelope válido, mas exigir que todos os arquivos que serão substituídos sejam inspecionados e validados antes de iniciar a gravação. A persistência falha de forma fechada, mantendo intactos o principal e a cópia anterior.
+**Architecture:** Manter a leitura tolerante para recuperar o último envelope válido, mas exigir que todos os arquivos de destino que podem ser substituídos sejam inspecionados e validados antes de iniciar a gravação. A persistência falha de forma fechada, mantendo intactos o principal e a cópia anterior.
 
 **Tech Stack:** React Native, Expo SDK 51, TypeScript, Node.js tests, Expo FileSystem mock.
 
@@ -25,6 +25,7 @@
 - Principal com schema futuro e cópia anterior válida: bloquear gravação sem degradar o arquivo futuro.
 - Principal válido com cópia anterior corrompida: bloquear gravação para não substituir a única cópia anterior preservada.
 - Principal válido com cópia anterior em schema futuro: bloquear gravação e preservar ambos.
+- Temporário existente corrompido ou de schema futuro: bloquear a gravação antes de sobrescrevê-lo.
 - JSON estruturalmente inválido ou diretório no caminho do arquivo: falhar de forma fechada.
 
 ---
@@ -40,8 +41,8 @@
 - Produz: `assertAutosaveFileReplaceable(path)`, usado antes de escrever qualquer arquivo temporário ou substituir o principal/anterior.
 
 **Steps:**
-- [ ] Adicionar testes para principal corrompido/schema futuro e cópia anterior corrompida/schema futuro.
-- [ ] Confirmar que `saveNow` retorna `false` e que bytes do principal/anterior não mudam.
+- [ ] Adicionar testes para principal corrompido/schema futuro e cópia anterior/temporário corrompidos ou de schema futuro.
+- [ ] Confirmar que `saveNow` retorna `false` e que bytes do principal, da cópia anterior e do temporário não mudam.
 - [ ] Validar formato, versão e payload de cada arquivo existente antes de iniciar a gravação.
 - [ ] Bloquear a gravação com erro explícito quando qualquer alvo não puder ser comprovado íntegro.
 - [ ] Executar a suíte completa, TypeScript, baseline e build Android na CI do SHA final.
