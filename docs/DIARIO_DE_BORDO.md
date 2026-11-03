@@ -1,19 +1,17 @@
-## ESTADO VIGENTE — 2026-11-02 (P0 layout instalado e proveniência do APK)
+## ESTADO VIGENTE — 2026-11-03 (auditoria do Diário e de todas as PRs)
 
-> PR #105 integrada em `main` no commit `b128b413427e612e621dc2ef2c82b6c2476ce659`. PR #104 integrada em `main` no commit `4055a776a4e95e1ec775c6b0ae039da234a7c6c6`. Ambas passaram `validate` e `android-build` nos respectivos SHAs finais.
+> Fonte de verdade para o estado integrado: branch `main`, SHA `a741112b70b04d22a31b5512b92b1c60dfe61e22`. PRs abertas são propostas, não mudanças integradas.
 
-- PR #98 permanece integrada: transporte Bluetooth Classic/ELM327 endurecido, buffer volátil com dez leituras reais do PID 012F, backup/restauração verificados e dados de manutenção no backup.
-- PR #101 permanece integrada: GPS opcional, opt-in explícito e ciclo de vida centralizado no `AutoTripService`, sem bloquear o início OBD.
-- PR #105 integrada: relatórios Bluetooth técnico/compartilhável, proteção de identificadores, JSON `MERIVA_DIAGNOSTIC_EXPORT` schema 1, metadados físicos sem inferência e preservação integral do histórico diário ECU.
-- PR #104 integrada: cockpit e telas responsivos, navegação em retrato/paisagem, áreas de toque ampliadas, cabeçalhos/retornos explícitos, Configurações reorganizada e botões separados para exportação Bluetooth técnica/compartilhável.
-- Validação PR #105: `validate` e `android-build` passaram no SHA `ff131e9b23ad745955dfe59904025a47cafabc98`.
-- Validação PR #104: `validate` e `android-build` passaram no SHA `2cdbda3807a50e68cd1fe24fe3ff207dc125dbfd`.
-- A CI também passou no push da `main` após a integração da PR #105, SHA `b128b413427e612e621dc2ef2c82b6c2476ce659`. O push de main após o merge da #104 está em execução e deve ser consultado no SHA final correspondente.
-- O repositório permanece público. PR #108 foi integrada por squash em `24651428eb4dff69ad3086627e739df07c1de4dd`: o upload do APK passou a ocorrer apenas em push para `main`, com retenção de 14 dias; não cria GitHub Release nem publica em branches/PRs.
-- O índice e os títulos do Diário estão alinhados até DB-194; DB-195 registra a divergência visual observada no APK instalado e a correção da publicação rastreável.
-- Não declarar inspeção visual ou teste físico no Galaxy A06 / SM-A065M / Android 16. Permanecem necessários screenshots em retrato/paisagem e teste ELM327/ECU real, incluindo respostas 010C/012F.
-- A execução CI da PR #108 (run `41205305161`, HEAD `83f702bd7d5247e53f5291f7806477ecdcf3e981`) aprovou `validate` e `android-build`; o upload foi corretamente ignorado por ser evento de PR. O push subsequente na `main` precisa concluir e publicar o artefato do SHA atual antes de enviar novo link de APK.
-
+- A CI da `main` no SHA acima concluiu com sucesso: run [#4682](https://github.com/luizmarquesarruda/meriva-smart-diagnostic/actions/runs/41384372064), jobs `validate` e `android-build` verdes. O artefato `meriva-smart-diagnostic-standalone-apk` foi publicado (29.771.179 bytes; expiração registrada para 2026-11-16). O repositório permanece público.
+- Política atualmente integrada: PR #108 mantém upload do APK somente em push para `main`, com retenção de 14 dias e sem GitHub Release automático. A ampliação para PRs/branches está proposta na #111 e ainda não está integrada; portanto, não atribuir essa capacidade à `main`.
+- PR #107 é documental: corrige a referência de velocidade para PID 010D e remove a duplicação de `PERM-GPS-01`. Os checks `validate` e `android-build` passaram no HEAD `13da5c77ac2eef09c51ff5ede66296201b9fc616`; PR aberta, sem merge.
+- PR #109 e #110 estão com conflito de integração (`mergeable_state=dirty`) contra a `main` atual e alteram 19 arquivos em comum. Não integrar uma depois da outra sem reconciliar persistência, workflow, testes e diário. A #109 recebeu correções de ID estável de viagem em retry e teste de falha no read-back do spool CSV; CI do novo HEAD ainda precisa concluir.
+- PR #110 contém endurecimento de JSON/schema e benchmark, mas seu último CI verde (#4609) pertence ao HEAD antigo `1b063df25bd84bf31d88a0d8424cee3f0bca59dd`; a branch está divergente e seu manifesto de backup valida tamanhos, não hashes por arquivo.
+- PR #111 corrige cockpit/tema. O build falhou no SHA anterior por JPEG inválido; o asset foi substituído no SHA `a040221cd438aefc7d063171e6557360a06a2355`. No run #4704, `validate` passou e `android-build` estava em execução na última consulta. PR aberta, sem merge.
+- O inventário do GitHub retornou 108 PRs: 33 merged, 71 closed sem merge e 4 abertas (#107, #109, #110, #111). PR fechada sem merge não é evidência de integração; não reabrir nem reaplicar automaticamente branches históricas.
+- O `main` contém DB-001 a DB-195. Esta atualização corrige os títulos divergentes do índice e o gate passa a exigir igualdade exata entre título e entrada. Não foi criado um novo ID DB: #109, #110 e #111 reutilizam numeração a partir de DB-195/196 em branches paralelas; a renumeração global depende da sequência de integração.
+- Permanecem `não validados`: inspeção visual física em Galaxy A06/Android 16; conexão real ELM327/ECU, respostas 010C/012F e percurso GPS. CI/build Android não substituem esses testes.
+- Relatório completo da auditoria: `docs/AUDITORIA_GERAL_DB_PR_2026-11-03.md`.
 
 ---
 
@@ -223,7 +221,7 @@
 - **DB-130** · 2026-10-25 — Otimização CSV avaliada e bloqueada pela versão instalada
 - **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
 - **DB-132** · 2026-10-27 — Cockpit sem duplicação de DTC; cartão substituído por pressão do coletor
-- **DB-133** · 2026-10-28 — CI: suíte de apresentação de saúde do ELM reintegrada ao npm test
+- **DB-133** · 2026-10-28 — CI: reintegrar suíte de apresentação de saúde do ELM
 - **DB-134** · 2026-10-28 — Corrigir contrato de layout obsoleto após remoção do DTC do cockpit
 - **DB-135** · 2026-10-28 — Corrigir navegação icon-only no cockpit
 - **DB-136** · 2026-10-28 — Sincronizar índice do diário após as novas entradas
@@ -233,13 +231,13 @@
 - **DB-140** · 2026-10-28 — Auditoria da rede móvel e dos provedores de localização
 - **DB-141** · 2026-10-28 — Auditoria profunda de PIDs, interpretação e integridade da IA local
 - **DB-142** · 2026-10-28 — Corrigir polaridade da prontidão no PID 0101
-- **DB-143** · 2026-10-28 — Decisão arquitetural: APK independente, sem dependência do Bubble
+- **DB-143** · 2026-10-28 — Aplicativo pessoal, independente e sem conta/login
 - **DB-144** · 2026-10-28 — Navegação por categorias, ícones e qualidade dos dados
 - **DB-145** · 2026-10-28 — Corrigir leitura KWP, retry e classificação do estado ECU/Bluetooth
 - **DB-146** · 2026-10-28 — Restaurar quadrantes 2×2 e paginação de PIDs no cockpit
 - **DB-147** · 2026-10-28 — Incluir os PIDs restantes no carrossel principal com navegação por setas
 - **DB-148** · 2026-10-28 — Auditoria e correção de cockpit em orientação paisagem
-- **DB-149** · 2026-10-28 — Grade 2×2 adaptável e navegação lateral direita em paisagem
+- **DB-149** · 2026-10-28 — Quadrantes adaptáveis em ambas as orientações
 - **DB-150** · 2026-10-28 — Auditoria crítica de layout e duplicações de conteúdo
 - **DB-151** · 2026-10-28 — Remoção do setter órfão após consolidar o Laboratório
 - **DB-152** · 2026-10-28 — Unificar marca visual entre cockpit e tela Viagens
@@ -253,7 +251,7 @@
 - **DB-160** · 2026-10-28 — Centralizar hipóteses da IA na tela Saúde
 - **DB-161** · 2026-10-28 — Corrigir rótulo obsoleto do atalho de armazenamento em Viagens
 - **DB-162** · 2026-10-29 — Limitar sondas nativas Bluetooth e falhar fechado em estado indeterminado
-- **DB-163** · 2026-10-29 — Aplicar timeout finito às sondas de disponibilidade e descoberta Bluetooth
+- **DB-163** · 2026-10-29 — Timeout finito para sondas de disponibilidade e descoberta Bluetooth
 - **DB-164** · 2026-10-29 — Limitar sondas nativas na preparação e ativação Bluetooth
 - **DB-165** · 2026-10-29 — Limitar a consulta HTTP opcional de clima e cancelar requisição vencida
 - **DB-166** · 2026-10-29 — Limitar sonda de rádio no monitor de saúde Bluetooth/ECU
@@ -275,10 +273,10 @@
 - **DB-182** · 2026-10-30 — Corrigir fixture de timestamp GPS e mockar ciclo de vida nativo em segundo plano
 - **DB-183** · 2026-10-30 — Confirmar movimento urbano sem exigir 8 m em cada callback GPS
 - **DB-184** · 2026-10-30 — Sincronizar índice DB-NNN com as novas entradas de auditoria
-- **DB-185** — Bloquear publicação pública/automática do APK; upload privado somente na branch main, checksum SHA-256 e Actions fixadas em commit.
-- **DB-186** — Desacoplar permissões GPS do OBD e centralizar o ciclo de vida de localização no AutoTripService.
-- **DB-187** · 2026-10-31 — Reconciliar Bluetooth, buffer 012F, backup e segurança de integração.
-- **DB-188** · 2026-10-31 — Integridade, privacidade e metadados verificados nos relatórios.
+- **DB-185** · 2026-10-31 — Bloquear publicação pública/automática do APK
+- **DB-186** · 2026-10-31 — Exigir opt-in GPS e centralizar a propriedade do rastreador
+- **DB-187** · 2026-10-31 — Reconciliar Bluetooth, buffer 012F, backup e segurança de integração
+- **DB-188** · 2026-10-31 — Integridade, privacidade e metadados verificados nos relatórios
 - **DB-189** · 2026-10-31 — Privacidade ampliada e snapshot do relatório Bluetooth
 - **DB-190** · 2026-10-31 — Preservação integral do histórico diário ECU
 - **DB-191** · 2026-10-31 — Consolidar layout responsivo sem regredir GPS, autonomia e restauração de backups
@@ -302,7 +300,7 @@ Antes de qualquer correção de código:
 7. Se a CI falhar, registrar a falha e somente então iniciar a próxima correção.
 8. Manter documentação e repositório sincronizados.
 
-## DB-001 · 2026-10-06 - Correção do carregamento do catálogo de combustível
+## DB-001 · 2026-10-06 — Correção do carregamento do catálogo de combustível
 
 ### Problema
 A CI #661 falhou no teste `tests/fuelIdentification.test.js`. O teste transpila `src/obd/fuelIdentification.ts` diretamente para CommonJS e o import default de `src/knowledge/fuel_types.json` não foi resolvido como esperado. O catálogo chegou como indefinido e a leitura de `codes` falhou.
@@ -350,7 +348,7 @@ Nenhuma falha de CI será tratada como correção concluída.
 - **Teste:** adicionada regressão estática para impedir o retorno do laço infinito em `sharedConnection`.
 - **Regra preservada:** ELM327 Mini é tratado como adaptador genérico; a conexão só vira OBD válido após resposta real `010C` com `41 0C`.
 
-## DB-003 · 2026-10-07 - Primeira camada do motor de raciocínio diagnóstico local
+## DB-003 · 2026-10-07 — Primeira camada do motor de raciocínio diagnóstico local
 
 ### Objetivo
 Transformar a base de PIDs, DTCs e aprendizado em um motor local de hipóteses rastreáveis, sem depender de ChatGPT/OpenAI para funcionar.
