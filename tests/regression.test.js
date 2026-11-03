@@ -1209,6 +1209,7 @@ async function testBackupCompleteness() {
     updatedAt: '2026-10-30T12:00:00.000Z',
   };
   await fakeFS.writeAsStringAsync(`${BASE}/MANUTENCAO/registros.json`, JSON.stringify(maintenanceData));
+  await fakeFS.writeAsStringAsync(`${BASE}/BANCO/utf8.txt`, 'Meriva — São Paulo 🚗');
 
   const info = await backup.createBackup(BASE);
   assert.deepStrictEqual(info.includes, expectedDirs);
@@ -1234,6 +1235,12 @@ async function testBackupCompleteness() {
   assert.strictEqual(bancoFileManifest.sha256,
     crypto.createHash('sha256').update('BANCO', 'utf8').digest('hex'),
     'manifesto deve registrar SHA-256 correto para o conteúdo UTF-8');
+
+  const unicodeFileManifest = bancoManifest.files.find((item) => item.path === 'utf8.txt');
+  assert.ok(unicodeFileManifest, 'manifesto deve incluir arquivos UTF-8 com caracteres não ASCII');
+  assert.strictEqual(unicodeFileManifest.sha256,
+    crypto.createHash('sha256').update('Meriva — São Paulo 🚗', 'utf8').digest('hex'),
+    'SHA-256 deve corresponder aos bytes UTF-8 de acentos, travessão e emoji');
 
   const selectedBackupName = 'meriva_smart_' + info.timestamp;
   const backedUpFilePath = backupRoot + '/BANCO/arquivo.txt';
@@ -1306,6 +1313,19 @@ async function testBackupRestore() {
   const available = await backup.listVerifiedBackups(BASE);
   assert.ok(available.some((item) => item.name === backupName),
     'backup íntegro deve aparecer na lista de restauração');
+
+  const manifestPath = `${BASE}/BACKUP/${backupName}/manifest.json`;
+  const originalSchema2Manifest = files.get(manifestPath);
+  const legacyManifest = JSON.parse(originalSchema2Manifest);
+  legacyManifest.schemaVersion = 1;
+  legacyManifest.directories.forEach((entry) => { delete entry.files; });
+  files.set(manifestPath, JSON.stringify(legacyManifest));
+  assert.ok((await backup.listVerifiedBackups(BASE)).some((item) => item.name === backupName),
+    'manifesto legado schema 1 deve continuar disponível quando os tamanhos conferem');
+  await backup.restoreBackup(BASE, backupName);
+  assert.strictEqual(files.get(`${BASE}/LOGS/obd.csv`), oldLog,
+    'restauração de manifesto legado schema 1 deve recuperar os arquivos');
+  files.set(manifestPath, originalSchema2Manifest);
 
   await fakeFS.writeAsStringAsync(`${BASE}/LOGS/obd.csv`, 'newer-telemetry');
   await fakeFS.writeAsStringAsync(`${BASE}/MANUTENCAO/registros.json`, '{"fuelings":[]}');
