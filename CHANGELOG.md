@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Viagens: reutiliza o mesmo ID/ciclo finalizado quando a gravação precisa de retry; impede que a tentativa repetida conte a mesma viagem duas vezes na autonomia.
+
 - CI/Android: publica o APK standalone e SHA-256 em `main` e em PRs originadas no próprio repositório; PRs de forks não publicam artefatos. Retenção de 14 dias, sem Release automática.
 - Persistência JSON: atualiza regressões para exigir erro explícito em leitura direta de perfil corrompido e fallback de interface somente em memória, sem sobrescrever arquivos corrompidos ou schemas futuros.
 - Bluetooth: atualiza o teste de retry para validar a implementação limitada em `bluetoothManager.ts` e a reutilização da lista de pareados durante a varredura.
