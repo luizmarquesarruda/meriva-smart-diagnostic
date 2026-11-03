@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### CI — artefato APK standalone em Pull Requests
+- Corrigido o teste de baseline que ainda bloqueava uploads fora da `main`, em conflito com a política aprovada de disponibilizar o APK nas execuções bem-sucedidas de branches e Pull Requests.
+- O gate agora exige o passo de upload sem restrição por evento/branch, nome estável `meriva-smart-diagnostic-standalone-apk` e retenção de 14 dias.
+- Mantidos verificação SHA-256 e ausência de publicação automática em GitHub Releases.
+
 ### Cockpit MERIVA SMART baseado na referência visual
 - Atualizado o cabeçalho para MERIVA SMART e incorporada a arte ilustrativa do veículo ao cartão superior, usando o perfil local configurado para nome, motorização e ano.
 - Reorganizados os quatro quadrantes principais para RPM (010C), velocidade (010D), temperatura (0105) e nível de combustível (012F), com ícones e destaques azul/ciano, mantendo a validação de resposta real e frescor dos dados.
