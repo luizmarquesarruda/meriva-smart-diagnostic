@@ -39,12 +39,9 @@ interface BackupManifest {
 }
 
 const BACKUP_DATA_DIRS = [
-  'BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'VIAGENS', 'MANUTENCAO',
+  'BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'LEITURAS', 'LOGS', 'VIAGENS', 'MANUTENCAO',
 ] as const;
-// Formato aceito apenas para restaurar snapshots antigos. Novos backups não
-// incluem LEITURAS/LOGS para evitar duplicar CSVs brutos e consumir toda a quota.
-const LEGACY_BACKUP_DATA_DIRS = ['LEITURAS', 'LOGS'] as const;
-const RESTORABLE_BACKUP_DATA_DIRS = [...BACKUP_DATA_DIRS, ...LEGACY_BACKUP_DATA_DIRS];
+const RESTORABLE_BACKUP_DATA_DIRS = BACKUP_DATA_DIRS;
 const MAX_BACKUPS_TO_KEEP = 5;
 
 const SHA256_K = [
@@ -336,7 +333,7 @@ async function createBackupSnapshot(
   }
 }
 
-/** Backups rotineiros excluem CSVs brutos de LEITURAS e LOGS. */
+/** Backups rotineiros preservam todos os oito diretórios, inclusive LEITURAS e LOGS. */
 export async function createBackup(basePath: string): Promise<BackupInfo> {
   return createBackupSnapshot(basePath, BACKUP_DATA_DIRS);
 }
