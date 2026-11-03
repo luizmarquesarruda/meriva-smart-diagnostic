@@ -323,6 +323,7 @@
 - **DB-204** · 2026-11-01 — Tornar o overflow CSV recuperável como segmentos canônicos após reinício
 - **DB-205** · 2026-11-01 — Instrumentar diagnóstico por tentativa no fallback de protocolo ELM
 - **DB-206** · 2026-11-01 — Tornar o benchmark JSON estrito e consistente para a decisão SQLite
+- **DB-207** · 2026-11-03 — Preservar o ID da viagem entre tentativas de finalização
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -5159,3 +5160,18 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - A medição continua sendo apenas JSON versus leitura/gravação temporária. SQLite não foi comparado e não foi introduzido; a decisão continua bloqueada até capturar dados reais e latências no Galaxy A06, comparar os mesmos históricos e testar migração/rollback.
 - Commits: `6e15b84ccbe0ec782b7588b4a74701fbc2a45770`, `33bb56dc4fddc6b907982d4a6dc1f3e79c3722b5`, `41ee3f1423e0357607d3837a33a39ce19ee00242`, `23c09da19f5dfea5f775622edcf60766132eac1b`, `ab3d5e32951ed6627db7b71ac54132186355f62a`.
 - A CI no HEAD final e a medição física ainda precisam ser verificadas; não foi executado benchmark no aparelho nesta etapa.
+
+## DB-207 · 2026-11-03 — Preservar o ID da viagem entre tentativas de finalização
+
+### Causa confirmada
+- Em `AutoTripService.finalizeRecorder()`, `buildDriveCycle()` era chamado a cada retry. O identificador incluía `finishedAtMs`, criado com `Date.now()`; uma falha de autosave depois da gravação do índice podia reconstruir a mesma viagem com outro ID. Isso anulava a deduplicação por ID e podia somar a mesma distância/combustível novamente à autonomia.
+
+### Correção aplicada
+- Criado `getOrCreatePendingTripCycle()` em `src/trip/tripFinalization.ts`, associado à identidade do gravador. Enquanto a mesma viagem estiver pendente, o objeto e o ID finalizado são reutilizados; um novo gravador recebe um ciclo novo.
+- `AutoTripService` mantém o ciclo pendente até todas as etapas de persistência concluírem e limpa o cache somente na liberação do gravador.
+- `tests/regression.test.js` cobre a reutilização do mesmo objeto/ID em retry e a criação de um ID novo para um gravador diferente.
+
+### Validação e limites
+- O teste novo foi incorporado à suíte de regressão existente. CI do SHA final e compilação Android precisam confirmar a alteração; resultado ainda **não validado** neste registro.
+- O risco separado de duplicação CSV após falha de read-back foi reavaliado: o spool atual grava em arquivo temporário, lê e valida o conteúdo, move para o nome canônico apenas após a validação e remove o temporário em qualquer exceção. O teste cobre reinício, segmentos canônicos e deduplicação; acrescentar falha simulada explícita de read-back continua recomendado antes de encerrar a auditoria dessa rotina.
+- Nenhuma alteração em Bluetooth/ELM/ECU, PID, GPS, autonomia/fórmulas, tanque, SQLite ou histórico diário ECU. SQLite continua condicionado às medições reais aprovadas no Galaxy A06.
