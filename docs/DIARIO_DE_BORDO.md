@@ -5057,7 +5057,7 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 ## ARTEFATO APK EM PULL REQUEST — 2026-11-03
 
 - Causa encontrada: o job Android compilava e verificava o APK, mas o passo de upload usava condição exclusiva para `refs/heads/main`; por isso execuções de PR terminavam sem artefato.
-- Corrigida a condição para publicar em `pull_request` e em `main`, mantendo o APK standalone e o arquivo SHA-256 no mesmo artefato.
+- Removida a condição restritiva do passo de upload: após build Android bem-sucedido, publica em push de branch (incluindo a branch da PR), evento `pull_request`, `main` e execução manual, mantendo APK standalone e SHA-256 no mesmo artefato.
 - Nome do artefato passa a identificar evento e número da PR/execução; retenção de 14 dias.
 - O upload em PR não mescla código, não cria release e não publica na branch principal.
 - Execução anterior 41698878105: build e checksum passaram no SHA `e64cd43e0290310948d5d34d33fcebdb5a348dd5`, mas nenhum artefato foi publicado devido à condição antiga.
