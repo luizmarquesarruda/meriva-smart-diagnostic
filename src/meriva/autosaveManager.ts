@@ -189,9 +189,9 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     const content = JSON.stringify(envelope, null, 2);
     const base = runtime.basePath;
 
-    // Inspecionar os dois arquivos antes de tocar no temporário ou nos
-    // destinos. Um fallback válido não autoriza destruir o principal inválido,
-    // e um principal válido não autoriza substituir uma cópia anterior inválida.
+    // Inspecionar principal, cópia anterior e temporário antes de escrever.
+    // Um fallback válido não autoriza destruir o principal inválido, e um
+    // principal válido não autoriza substituir backup/temporário inválido.
     await assertAutosaveFileReplaceable(mainPath(base));
     await assertAutosaveFileReplaceable(previousPath(base));
     await assertAutosaveFileReplaceable(tmpPath(base));
