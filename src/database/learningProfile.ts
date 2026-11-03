@@ -286,12 +286,13 @@ export async function createLearningProfile(
     if (existing) return existing;
 
     const now = new Date().toISOString();
+    const normalizedSeedImportDate = Number.isFinite(Date.parse(seedImportDate)) ? seedImportDate : now;
     const profile: MerivaLearningProfile = {
       vehicleId: 'MERIVA_MAXX',
       profileCreated: now,
       lastUpdated: now,
       seedVersion: 'NONE',
-      seedImportDate,
+      seedImportDate: normalizedSeedImportDate,
       learningStatus: 'COLD_START',
       confidenceThresholds: {
         low: 10,
