@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Backup — manifesto schema 2 e integridade por arquivo
+- Novos backups usam manifesto schema 2 com caminho relativo, tamanho em bytes e hash SHA-256 UTF-8 para cada arquivo; a verificação rejeita conteúdo alterado mesmo quando o tamanho não muda.
+- Caminhos absolutos, traversal, separadores invertidos e entradas duplicadas são rejeitados. A leitura/restauração de manifestos legados schema 1 permanece suportada.
+- Permanecem incluídos os oito diretórios de dados: BANCO, APRENDIZADO, DTC, CONFIG, LEITURAS, LOGS, VIAGENS e MANUTENCAO.
+- A verificação por hash detecta corrupção/alteração do conteúdo em relação ao manifesto; não é assinatura criptográfica nem prova de autenticidade contra quem consiga alterar simultaneamente os arquivos e o manifesto.
+- CI do SHA `13d22004563cbf516a6d3f82cd9213d927dee43d`: validate e android-build aprovados. Nenhum teste físico em Galaxy A06/ELM327 foi realizado nesta fase.
+
 ### GPS / background location
 - Corrigido o fixture de recuperação para respeitar o timestamp estritamente crescente após amostras com precisão desconhecida.
 - Expandido o mock de Expo Location e incluídos testes de start/stop/reuso da tarefa nativa de localização em segundo plano.

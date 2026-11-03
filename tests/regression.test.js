@@ -1209,24 +1209,67 @@ async function testBackupCompleteness() {
     updatedAt: '2026-10-30T12:00:00.000Z',
   };
   await fakeFS.writeAsStringAsync(`${BASE}/MANUTENCAO/registros.json`, JSON.stringify(maintenanceData));
+  await fakeFS.writeAsStringAsync(`${BASE}/BANCO/utf8.txt`, 'Meriva — São Paulo 🚗');
 
   const info = await backup.createBackup(BASE);
   assert.deepStrictEqual(info.includes, expectedDirs);
 
   const backupRoot = `${BASE}/BACKUP/meriva_smart_${info.timestamp}`;
   const manifest = JSON.parse(files.get(`${backupRoot}/manifest.json`));
-  assert.strictEqual(manifest.schemaVersion, 1);
+  assert.strictEqual(manifest.schemaVersion, 2,
+    'novos backups devem usar manifesto com integridade SHA-256 por arquivo');
   assert.strictEqual(manifest.payloadSizeBytes, info.sizeBytes,
     'manifest deve declarar tamanho verificado do conteúdo copiado');
   assert.deepStrictEqual(manifest.directories.map((item) => item.directory), expectedDirs);
   for (const dir of expectedDirs) {
-    assert.strictEqual(
-      files.get(`${backupRoot}/${dir}/arquivo.txt`),
-      dir,
-      `backup deve conter ${dir}`,
-    );
+    assert.strictEqual(files.get(backupRoot + '/' + dir + '/arquivo.txt'), dir,
+      'backup deve conter ' + dir);
+    const directoryManifest = manifest.directories.find((item) => item.directory === dir);
+    assert.ok(Array.isArray(directoryManifest.files),
+      'cada diretório precisa declarar os arquivos individuais no schema 2');
   }
-  const backedUpMaintenance = JSON.parse(files.get(`${backupRoot}/MANUTENCAO/registros.json`));
+
+  const bancoManifest = manifest.directories.find((item) => item.directory === 'BANCO');
+  const bancoFileManifest = bancoManifest.files.find((item) => item.path === 'arquivo.txt');
+  const crypto = require('crypto');
+  assert.strictEqual(bancoFileManifest.sha256,
+    crypto.createHash('sha256').update('BANCO', 'utf8').digest('hex'),
+    'manifesto deve registrar SHA-256 correto para o conteúdo UTF-8');
+
+  const unicodeFileManifest = bancoManifest.files.find((item) => item.path === 'utf8.txt');
+  assert.ok(unicodeFileManifest, 'manifesto deve incluir arquivos UTF-8 com caracteres não ASCII');
+  assert.strictEqual(unicodeFileManifest.sha256,
+    crypto.createHash('sha256').update('Meriva — São Paulo 🚗', 'utf8').digest('hex'),
+    'SHA-256 deve corresponder aos bytes UTF-8 de acentos, travessão e emoji');
+
+  const selectedBackupName = 'meriva_smart_' + info.timestamp;
+  const backedUpFilePath = backupRoot + '/BANCO/arquivo.txt';
+  const originalBackedUpContent = files.get(backedUpFilePath);
+  const sameSizeCorruption = 'XANCO';
+  assert.strictEqual(Buffer.byteLength(sameSizeCorruption, 'utf8'), Buffer.byteLength(originalBackedUpContent, 'utf8'),
+    'o fixture deve alterar o conteúdo sem alterar o tamanho');
+  files.set(backedUpFilePath, sameSizeCorruption);
+  assert.ok(!(await backup.listVerifiedBackups(BASE)).some((item) => item.name === selectedBackupName),
+    'backup corrompido com tamanho preservado não deve ser oferecido para restauração');
+  await assert.rejects(
+    () => backup.restoreBackup(BASE, selectedBackupName),
+    /BACKUP_FILE_HASH_MISMATCH/,
+    'restauração deve rejeitar corrupção de mesmo tamanho',
+  );
+  files.set(backedUpFilePath, originalBackedUpContent);
+
+  const originalManifestContent = files.get(backupRoot + '/manifest.json');
+  const unsafeManifest = JSON.parse(originalManifestContent);
+  unsafeManifest.directories.find((item) => item.directory === 'BANCO').files[0].path = '../arquivo.txt';
+  files.set(backupRoot + '/manifest.json', JSON.stringify(unsafeManifest));
+  await assert.rejects(
+    () => backup.restoreBackup(BASE, selectedBackupName),
+    /BACKUP_FILE_MANIFEST_INVALID/,
+    'manifesto não pode aceitar caminho relativo que escape do diretório do backup',
+  );
+  files.set(backupRoot + '/manifest.json', originalManifestContent);
+
+  const backedUpMaintenance = JSON.parse(files.get(backupRoot + '/MANUTENCAO/registros.json'));
   assert.deepStrictEqual(backedUpMaintenance, maintenanceData,
     'backup deve preservar quilometragem, plano de manutenção e abastecimentos manuais');
 
@@ -1270,6 +1313,19 @@ async function testBackupRestore() {
   const available = await backup.listVerifiedBackups(BASE);
   assert.ok(available.some((item) => item.name === backupName),
     'backup íntegro deve aparecer na lista de restauração');
+
+  const manifestPath = `${BASE}/BACKUP/${backupName}/manifest.json`;
+  const originalSchema2Manifest = files.get(manifestPath);
+  const legacyManifest = JSON.parse(originalSchema2Manifest);
+  legacyManifest.schemaVersion = 1;
+  legacyManifest.directories.forEach((entry) => { delete entry.files; });
+  files.set(manifestPath, JSON.stringify(legacyManifest));
+  assert.ok((await backup.listVerifiedBackups(BASE)).some((item) => item.name === backupName),
+    'manifesto legado schema 1 deve continuar disponível quando os tamanhos conferem');
+  await backup.restoreBackup(BASE, backupName);
+  assert.strictEqual(files.get(`${BASE}/LOGS/obd.csv`), oldLog,
+    'restauração de manifesto legado schema 1 deve recuperar os arquivos');
+  files.set(manifestPath, originalSchema2Manifest);
 
   await fakeFS.writeAsStringAsync(`${BASE}/LOGS/obd.csv`, 'newer-telemetry');
   await fakeFS.writeAsStringAsync(`${BASE}/MANUTENCAO/registros.json`, '{"fuelings":[]}');
