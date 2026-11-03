@@ -1,3 +1,14 @@
+## CONTROLE DE VERSÃO — 2026-11-03
+
+- Criado fluxo SemVer estável para releases Android, mantendo a versão atual em 1.0.1 nesta implementação.
+- `package.json` é a referência operacional; `package-lock.json` e `app.json` são verificados contra ela.
+- Adicionado `android.versionCode=10001`, derivado de MAJOR×10000 + MINOR×100 + PATCH; MINOR/PATCH são limitados a 0–99.
+- Incluídos comandos npm de verificação e incremento patch/minor/major, testes de fronteira e gate na CI.
+- Não foram criadas tags ou GitHub Releases nem alterada a política de distribuição do APK. Nenhuma mudança em Bluetooth, ECU, GPS, autonomia, armazenamento ou telemetria.
+- Validação física Galaxy A06/Android 16 + ELM327: não executada nesta alteração.
+
+---
+
 ## ESTADO VIGENTE — 2026-11-02 (P0 layout instalado e proveniência do APK)
 
 > PR #105 integrada em `main` no commit `b128b413427e612e621dc2ef2c82b6c2476ce659`. PR #104 integrada em `main` no commit `4055a776a4e95e1ec775c6b0ae039da234a7c6c6`. Ambas passaram `validate` e `android-build` nos respectivos SHAs finais.

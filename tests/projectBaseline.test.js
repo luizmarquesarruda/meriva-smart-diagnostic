@@ -50,10 +50,18 @@ assert.match(workflow, /actions\/setup-node@949feb2413d6458794dcd2491c4babbbce0c
 assert.match(workflow, /actions\/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad/);
 assert.match(workflow, /actions\/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9/);
 assert.equal(packageJson.scripts.validate, 'npm run typecheck && npm test');
+assert.equal(packageJson.scripts['version:check'], 'node scripts/version-control.cjs check');
+assert.equal(packageJson.version, app.expo.version, 'package.json e app.json precisam compartilhar a mesma versão');
+assert.equal(lock.version, packageJson.version, 'package-lock.json e package.json precisam compartilhar a mesma versão');
+assert.equal(lock.packages[''].version, packageJson.version, 'versão raiz do lockfile divergente');
+const versionParts = packageJson.version.split('.').map(Number);
+assert.equal(app.expo.android.versionCode, versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2], 'versionCode Android deve acompanhar a versão SemVer');
+assert.match(workflow, /name: Validate release version metadata[\s\S]*?run: npm run version:check/);
 
 // Regression-sensitive suites must remain connected to npm test.
 // Removing a test file from the script must fail this gate before merge.
 const requiredSuites = [
+  'versionControl.test.js',
   'dailyObdHistory.test.js',
   'pidParserIntegrity.test.js',
   'weatherRefresh.test.js',

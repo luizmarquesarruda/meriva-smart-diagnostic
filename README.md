@@ -215,3 +215,36 @@ A revisão cruzou código, catálogos JSON, testes e o TXT de autosaves fornecid
 ### Throttle do autosave de telemetria
 
 As últimas leituras em memória são atualizadas a cada resposta; mudanças contínuas de RPM/velocidade não regravam todo o autosave e o histórico TXT a cada ciclo. A persistência ordinária por PID fica limitada a uma vez por 10 segundos; PID novo e mudanças de status/unidade/origem são persistidos imediatamente. Ao sair para background, o app compara o fingerprint do estado para descarregar também valores em memória que ainda não venceram a janela. A fila CSV continua preservando cada amostra real.
+
+
+## Controle de versão e releases
+
+O app usa SemVer estável (\`MAJOR.MINOR.PATCH\`). \`package.json\` é a referência operacional e deve permanecer sincronizado com \`package-lock.json\` e \`app.json\`. O \`android.versionCode\` é calculado como \`MAJOR × 10000 + MINOR × 100 + PATCH\`; MINOR e PATCH usam valores de 0 a 99.
+
+Antes de validar ou compilar, execute \`npm run version:check\`.
+
+Para preparar o próximo incremento:
+
+\`\`\`bash
+npm run version:patch   # correção compatível
+npm run version:minor   # funcionalidade compatível
+npm run version:major   # mudança incompatível
+\`\`\`
+
+Os comandos atualizam \`package.json\`, \`package-lock.json\` e \`app.json\`. A CI verifica a consistência automaticamente. O incremento não cria tags/releases nem publica APK; a publicação de artefato permanece restrita ao push para \`main\`.
+
+## Controle de versão e releases
+
+O app usa SemVer estável (`MAJOR.MINOR.PATCH`). `package.json` é a referência operacional e deve permanecer sincronizado com `package-lock.json` e `app.json`. O `android.versionCode` é calculado como `MAJOR × 10000 + MINOR × 100 + PATCH`; MINOR e PATCH usam valores de 0 a 99.
+
+Antes de validar ou compilar, execute `npm run version:check`.
+
+Para preparar o próximo incremento:
+
+```bash
+npm run version:patch   # correção compatível
+npm run version:minor   # funcionalidade compatível
+npm run version:major   # mudança incompatível
+```
+
+Os comandos atualizam `package.json`, `package-lock.json` e `app.json`. A CI verifica a consistência automaticamente. O incremento não cria tags/releases nem publica APK; a publicação de artefato permanece restrita ao push para `main`.
