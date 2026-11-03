@@ -298,11 +298,22 @@ test('3. arquivo principal corrompido -> restaura previous.json', async () => {
     s.settings.fase = 'ultima';
   });
   await m.saveNow('critical'); // main = ultima, previous = anterior
-  files.set(`${CONFIG_DIR}/autosave.json`, '{ISTO É JSON CORROMPIDO');
+  const mainPath = `${CONFIG_DIR}/autosave.json`;
+  const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
+  const corruptMain = '{ISTO É JSON CORROMPIDO';
+  const previousBefore = files.get(previousPath);
+  files.set(mainPath, corruptMain);
   m.disposeAutoSave();
   await m.initAutoSave(BASE);
-  assert.strictEqual(m.getAutoSaveState().settings.fase, 'anterior', 'deve cair no previous.json');
-  assert.ok(files.has(`${CONFIG_DIR}/autosave.json`), 'arquivo corrompido não deve ser apagado no load');
+  assert.strictEqual(m.getAutoSaveState().settings.fase, 'anterior', 'deve cair no previous.json para leitura');
+
+  m.updateAutoSaveState((s) => { s.settings.novaAlteracao = true; });
+  assert.strictEqual(await m.saveNow('critical'), false,
+    'não deve gravar por cima do principal corrompido mesmo com fallback válido');
+  assert.strictEqual(files.get(mainPath), corruptMain, 'principal corrompido deve permanecer byte a byte');
+  assert.strictEqual(files.get(previousPath), previousBefore, 'cópia anterior válida não pode ser substituída pelo principal corrompido');
+  assert.match(m.getAutoSaveStatus().lastError, /JSON_CORROMPIDO/);
+  m.disposeAutoSave();
 });
 
 test('4. schema antigo -> migrar', async () => {
@@ -355,14 +366,73 @@ test('5. schema futuro -> não destruir, usar fallback', async () => {
     payload: {},
   });
   files.set(`${CONFIG_DIR}/autosave.json`, future);
+  const mainPath = `${CONFIG_DIR}/autosave.json`;
+  const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
+  const previousBefore = files.get(previousPath);
+  files.set(mainPath, future);
   m.disposeAutoSave();
   await m.initAutoSave(BASE);
-  assert.strictEqual(m.getAutoSaveState().settings.fase, 'valida', 'deve restaurar previous.json');
-  assert.strictEqual(
-    JSON.parse(files.get(`${CONFIG_DIR}/autosave.json`)).schemaVersion,
-    99,
-    'arquivo futuro não pode ser destruído',
-  );
+  assert.strictEqual(m.getAutoSaveState().settings.fase, 'valida', 'deve restaurar previous.json para leitura');
+
+  m.updateAutoSaveState((s) => { s.settings.novaAlteracao = true; });
+  assert.strictEqual(await m.saveNow('critical'), false,
+    'não deve gravar por cima do principal de schema futuro');
+  assert.strictEqual(files.get(mainPath), future, 'principal de schema futuro deve permanecer intacto');
+  assert.strictEqual(files.get(previousPath), previousBefore, 'fallback válido não pode ser sobrescrito');
+  assert.match(m.getAutoSaveStatus().lastError, /SCHEMA_FUTURO/);
+  m.disposeAutoSave();
+});
+
+test('5a. cópia anterior corrompida bloqueia gravação sem alterar principal nem backup', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  m.updateAutoSaveState((s) => { s.settings.fase = 'principal-valido'; });
+  await m.saveNow('critical');
+  m.updateAutoSaveState((s) => { s.settings.fase = 'anterior-valido'; });
+  await m.saveNow('critical');
+
+  const mainPath = `${CONFIG_DIR}/autosave.json`;
+  const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
+  const mainBefore = files.get(mainPath);
+  const corruptPrevious = '{BACKUP CORROMPIDO';
+  files.set(previousPath, corruptPrevious);
+
+  m.updateAutoSaveState((s) => { s.settings.novaAlteracao = true; });
+  assert.strictEqual(await m.saveNow('critical'), false, 'cópia anterior corrompida deve bloquear a gravação');
+  assert.strictEqual(files.get(mainPath), mainBefore, 'principal válido deve permanecer intacto');
+  assert.strictEqual(files.get(previousPath), corruptPrevious, 'cópia anterior corrompida deve permanecer intacta');
+  m.disposeAutoSave();
+});
+
+test('5b. cópia anterior de schema futuro bloqueia gravação sem alterar principal nem backup', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  m.updateAutoSaveState((s) => { s.settings.fase = 'principal-valido'; });
+  await m.saveNow('critical');
+  m.updateAutoSaveState((s) => { s.settings.fase = 'anterior-valido'; });
+  await m.saveNow('critical');
+
+  const mainPath = `${CONFIG_DIR}/autosave.json`;
+  const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
+  const mainBefore = files.get(mainPath);
+  const futurePrevious = JSON.stringify({
+    schemaVersion: 99,
+    savedAt: new Date().toISOString(),
+    dataType: 'APP_STATE',
+    source: 'versao-futura',
+    payload: {},
+  });
+  files.set(previousPath, futurePrevious);
+
+  m.updateAutoSaveState((s) => { s.settings.novaAlteracao = true; });
+  assert.strictEqual(await m.saveNow('critical'), false, 'cópia anterior de schema futuro deve bloquear a gravação');
+  assert.strictEqual(files.get(mainPath), mainBefore, 'principal válido deve permanecer intacto');
+  assert.strictEqual(files.get(previousPath), futurePrevious, 'cópia anterior futura deve permanecer intacta');
+  m.disposeAutoSave();
 });
 
 test('6. SIMULACAO não contamina learning nem banco de PIDs', async () => {
