@@ -378,10 +378,11 @@ export async function restoreBackup(basePath: string, backupName: string): Promi
   const backupRoot = `${basePath}/BACKUP`;
   const sourceDir = `${backupRoot}/${backupName}`;
   const manifest = await readVerifiedManifest(sourceDir);
-  // LEITURAS/LOGS ficam arquivados e verificados no backup, mas os dados
-  // operacionais mais recentes nunca são substituídos por uma restauração.
+  // Snapshots schema 2 carregam a telemetria atual para verificação/arquivo,
+  // mas não substituem CSVs mais recentes do aparelho durante uma restauração.
+  // Snapshots schema 1 mantêm a semântica legada: restaurar as pastas declaradas.
   const directoriesToRestore = manifest.directories.filter((entry) =>
-    entry.directory !== 'LEITURAS' && entry.directory !== 'LOGS',
+    manifest.schemaVersion === 1 || (entry.directory !== 'LEITURAS' && entry.directory !== 'LOGS'),
   );
   const stagingDir = `${backupRoot}/restore-staging-${Date.now()}`;
   await FileSystem.makeDirectoryAsync(stagingDir, { intermediates: true });
