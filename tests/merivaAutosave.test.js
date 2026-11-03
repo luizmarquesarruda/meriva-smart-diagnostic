@@ -493,6 +493,30 @@ test('5d. temporário de schema futuro bloqueia gravação sem alterar os três 
   m.disposeAutoSave();
 });
 
+test('5e. caminho principal convertido em diretório bloqueia gravação', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  m.updateAutoSaveState((s) => { s.settings.fase = 'principal-valido'; });
+  await m.saveNow('critical');
+  m.updateAutoSaveState((s) => { s.settings.fase = 'anterior-valido'; });
+  await m.saveNow('critical');
+
+  const mainPath = `${CONFIG_DIR}/autosave.json`;
+  const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
+  const previousBefore = files.get(previousPath);
+  files.delete(mainPath);
+  dirs.add(mainPath);
+
+  m.updateAutoSaveState((s) => { s.settings.novaAlteracao = true; });
+  assert.strictEqual(await m.saveNow('critical'), false, 'diretório no caminho do principal deve bloquear a gravação');
+  assert.strictEqual(files.has(mainPath), false, 'o caminho inesperado não pode virar arquivo por substituição');
+  assert.strictEqual(dirs.has(mainPath), true, 'o diretório original deve permanecer');
+  assert.strictEqual(files.get(previousPath), previousBefore, 'cópia anterior válida deve permanecer intacta');
+  m.disposeAutoSave();
+});
+
 test('6. SIMULACAO não contamina learning nem banco de PIDs', async () => {
   const m = manager();
   m.disposeAutoSave();
