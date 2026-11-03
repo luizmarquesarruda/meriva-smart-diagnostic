@@ -223,7 +223,7 @@
 - **DB-130** · 2026-10-25 — Otimização CSV avaliada e bloqueada pela versão instalada
 - **DB-131** · 2026-10-25 — Atualização periódica de localização/clima baseada em conectividade
 - **DB-132** · 2026-10-27 — Cockpit sem duplicação de DTC; cartão substituído por pressão do coletor
-- **DB-133** · 2026-10-28 — CI: suíte de apresentação de saúde do ELM reintegrada ao npm test
+- **DB-133** · 2026-10-28 — CI: reintegrar suíte de apresentação de saúde do ELM
 - **DB-134** · 2026-10-28 — Corrigir contrato de layout obsoleto após remoção do DTC do cockpit
 - **DB-135** · 2026-10-28 — Corrigir navegação icon-only no cockpit
 - **DB-136** · 2026-10-28 — Sincronizar índice do diário após as novas entradas
@@ -233,13 +233,13 @@
 - **DB-140** · 2026-10-28 — Auditoria da rede móvel e dos provedores de localização
 - **DB-141** · 2026-10-28 — Auditoria profunda de PIDs, interpretação e integridade da IA local
 - **DB-142** · 2026-10-28 — Corrigir polaridade da prontidão no PID 0101
-- **DB-143** · 2026-10-28 — Decisão arquitetural: APK independente, sem dependência do Bubble
+- **DB-143** · 2026-10-28 — Aplicativo pessoal, independente e sem conta/login
 - **DB-144** · 2026-10-28 — Navegação por categorias, ícones e qualidade dos dados
 - **DB-145** · 2026-10-28 — Corrigir leitura KWP, retry e classificação do estado ECU/Bluetooth
 - **DB-146** · 2026-10-28 — Restaurar quadrantes 2×2 e paginação de PIDs no cockpit
 - **DB-147** · 2026-10-28 — Incluir os PIDs restantes no carrossel principal com navegação por setas
 - **DB-148** · 2026-10-28 — Auditoria e correção de cockpit em orientação paisagem
-- **DB-149** · 2026-10-28 — Grade 2×2 adaptável e navegação lateral direita em paisagem
+- **DB-149** · 2026-10-28 — Quadrantes adaptáveis em ambas as orientações
 - **DB-150** · 2026-10-28 — Auditoria crítica de layout e duplicações de conteúdo
 - **DB-151** · 2026-10-28 — Remoção do setter órfão após consolidar o Laboratório
 - **DB-152** · 2026-10-28 — Unificar marca visual entre cockpit e tela Viagens
@@ -253,7 +253,7 @@
 - **DB-160** · 2026-10-28 — Centralizar hipóteses da IA na tela Saúde
 - **DB-161** · 2026-10-28 — Corrigir rótulo obsoleto do atalho de armazenamento em Viagens
 - **DB-162** · 2026-10-29 — Limitar sondas nativas Bluetooth e falhar fechado em estado indeterminado
-- **DB-163** · 2026-10-29 — Aplicar timeout finito às sondas de disponibilidade e descoberta Bluetooth
+- **DB-163** · 2026-10-29 — Timeout finito para sondas de disponibilidade e descoberta Bluetooth
 - **DB-164** · 2026-10-29 — Limitar sondas nativas na preparação e ativação Bluetooth
 - **DB-165** · 2026-10-29 — Limitar a consulta HTTP opcional de clima e cancelar requisição vencida
 - **DB-166** · 2026-10-29 — Limitar sonda de rádio no monitor de saúde Bluetooth/ECU
@@ -275,10 +275,10 @@
 - **DB-182** · 2026-10-30 — Corrigir fixture de timestamp GPS e mockar ciclo de vida nativo em segundo plano
 - **DB-183** · 2026-10-30 — Confirmar movimento urbano sem exigir 8 m em cada callback GPS
 - **DB-184** · 2026-10-30 — Sincronizar índice DB-NNN com as novas entradas de auditoria
-- **DB-185** — Bloquear publicação pública/automática do APK; upload privado somente na branch main, checksum SHA-256 e Actions fixadas em commit.
-- **DB-186** — Desacoplar permissões GPS do OBD e centralizar o ciclo de vida de localização no AutoTripService.
-- **DB-187** · 2026-10-31 — Reconciliar Bluetooth, buffer 012F, backup e segurança de integração.
-- **DB-188** · 2026-10-31 — Integridade, privacidade e metadados verificados nos relatórios.
+- **DB-185** · 2026-10-31 — Bloquear publicação pública/automática do APK
+- **DB-186** · 2026-10-31 — Exigir opt-in GPS e centralizar a propriedade do rastreador
+- **DB-187** · 2026-10-31 — Reconciliar Bluetooth, buffer 012F, backup e segurança de integração
+- **DB-188** · 2026-10-31 — Integridade, privacidade e metadados verificados nos relatórios
 - **DB-189** · 2026-10-31 — Privacidade ampliada e snapshot do relatório Bluetooth
 - **DB-190** · 2026-10-31 — Preservação integral do histórico diário ECU
 - **DB-191** · 2026-10-31 — Consolidar layout responsivo sem regredir GPS, autonomia e restauração de backups
@@ -305,7 +305,7 @@ Antes de qualquer correção de código:
 7. Se a CI falhar, registrar a falha e somente então iniciar a próxima correção.
 8. Manter documentação e repositório sincronizados.
 
-## DB-001 · 2026-10-06 - Correção do carregamento do catálogo de combustível
+## DB-001 · 2026-10-06 — Correção do carregamento do catálogo de combustível
 
 ### Problema
 A CI #661 falhou no teste `tests/fuelIdentification.test.js`. O teste transpila `src/obd/fuelIdentification.ts` diretamente para CommonJS e o import default de `src/knowledge/fuel_types.json` não foi resolvido como esperado. O catálogo chegou como indefinido e a leitura de `codes` falhou.
@@ -353,7 +353,7 @@ Nenhuma falha de CI será tratada como correção concluída.
 - **Teste:** adicionada regressão estática para impedir o retorno do laço infinito em `sharedConnection`.
 - **Regra preservada:** ELM327 Mini é tratado como adaptador genérico; a conexão só vira OBD válido após resposta real `010C` com `41 0C`.
 
-## DB-003 · 2026-10-07 - Primeira camada do motor de raciocínio diagnóstico local
+## DB-003 · 2026-10-07 — Primeira camada do motor de raciocínio diagnóstico local
 
 ### Objetivo
 Transformar a base de PIDs, DTCs e aprendizado em um motor local de hipóteses rastreáveis, sem depender de ChatGPT/OpenAI para funcionar.
