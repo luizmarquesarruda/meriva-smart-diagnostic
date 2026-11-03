@@ -259,3 +259,12 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 - Usar `npm run version:patch`, `npm run version:minor` ou `npm run version:major` para atualizar os três arquivos de metadados.
 - Não criar tag, GitHub Release ou publicar APK automaticamente. O APK continua sendo artefato somente do push para `main`.
 - Alterar a versão não comprova instalação nem funcionamento no Galaxy A06/ELM327; validação física permanece separada.
+
+
+## BUILD-PROV-01 — Proveniência verificável do APK
+
+- Cada APK de CI incorpora SHA completo/curto do commit, versão SemVer, `android.versionCode`, timestamp UTC e ID da execução GitHub.
+- A tela Configurações apresenta versão, SHA curto, data/hora local de compilação e ID da execução; builds locais identificam-se como `LOCAL`.
+- O artefato publicado em `main` inclui `app-release.apk`, checksum SHA-256 e `meriva-build-info.json`; o manifesto deve apontar para o mesmo SHA da execução.
+- PRs/branches não publicam artefato; o manifesto não altera versão, permissões ou lógica funcional do app.
+- A tela e o manifesto devem ser comparados com o SHA instalado no Galaxy A06; CI não substitui a verificação no aparelho.
