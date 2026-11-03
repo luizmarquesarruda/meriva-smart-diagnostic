@@ -93,3 +93,24 @@ A auditoria não comprova defeito de layout no Galaxy A06 e não declara teste f
 - Samsung Support — ajustar fonte e zoom da tela: https://www.samsung.com/br/support/
 - React Native — compatibilidade por versão/plataforma: https://reactnative.dev/docs/environment-setup
 - Expo — Android 16 e edge-to-edge em SDKs recentes: https://expo.dev/blog
+
+
+---
+
+## Complemento — auditoria de paleta e contraste (2026-11-02)
+
+**Base examinada:** `main`, SHA `a741112b70b04d22a31b5512b92b1c60dfe61e22`.
+
+### Achados e correções
+
+- A inspeção das telas encontrou cores hexadecimais repetidas diretamente em propriedades de borda, apesar do tema compartilhado em `src/ui/theme.ts`.
+- O token `COLORS.border` original (`#28415f`) tinha contraste aproximado de 1,81:1 contra o fundo `#07111f`. Foi alterado para `#456a92`, com contraste calculado de aproximadamente 3,36:1 no fundo principal, 3,07:1 em `#0e1b2d` e 3,03:1 em `#111c2e`.
+- Tokens dedicados foram adicionados para bordas sutis/de seleção, bordas de sucesso/falha e destaque teal. As telas usam esses tokens em vez de repetir cores nas propriedades de borda.
+- Os estados de armazenamento foram padronizados com as cores semânticas de sucesso, aviso e erro. O texto auxiliar que usava `#64748b` passou a utilizar `COLORS.textSubtle`.
+- O teste estrutural de tema agora calcula contraste e reprova regressões de bordas hexadecimais diretas nos componentes.
+
+### Limites
+
+- A referência `@/pantone` não corresponde a arquivo, diretório ou alias encontrado na árvore do repositório. Nenhum código Pantone oficial foi presumido.
+- A auditoria é estática; não houve renderização, captura de tela ou teste em aparelho. A inspeção de fonte ampliada/zoom do One UI, recortes e alvos de toque no Galaxy A06 continua pendente.
+- A CI e o build Android devem ser avaliados no SHA final da PR. Não considerar este registro como validação física.

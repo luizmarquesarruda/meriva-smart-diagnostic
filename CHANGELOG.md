@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Layout e consistência visual
+- Centralizadas as bordas dos componentes no tema compartilhado; o token principal oferece contraste mínimo de 3:1 sobre as superfícies do aplicativo.
+- Padronizadas bordas de cartões, controles e estados de conexão, preservando fundos, identidade azul/teal e cores funcionais dos dados.
+- Status de armazenamento e avisos passam a usar as cores semânticas do tema.
+- Testes verificam contraste para bordas e texto auxiliar e impedem a reintrodução de cores hexadecimais diretamente nas propriedades de borda.
+
 ### GPS / background location
 - Corrigido o fixture de recuperação para respeitar o timestamp estritamente crescente após amostras com precisão desconhecida.
 - Expandido o mock de Expo Location e incluídos testes de start/stop/reuso da tarefa nativa de localização em segundo plano.

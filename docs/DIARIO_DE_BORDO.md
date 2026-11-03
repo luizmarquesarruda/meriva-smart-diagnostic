@@ -10,7 +10,7 @@
 - Validação PR #104: `validate` e `android-build` passaram no SHA `2cdbda3807a50e68cd1fe24fe3ff207dc125dbfd`.
 - A CI também passou no push da `main` após a integração da PR #105, SHA `b128b413427e612e621dc2ef2c82b6c2476ce659`. O push de main após o merge da #104 está em execução e deve ser consultado no SHA final correspondente.
 - O repositório permanece público. PR #108 foi integrada por squash em `24651428eb4dff69ad3086627e739df07c1de4dd`: o upload do APK passou a ocorrer apenas em push para `main`, com retenção de 14 dias; não cria GitHub Release nem publica em branches/PRs.
-- O índice e os títulos do Diário estão alinhados até DB-194; DB-195 registra a divergência visual observada no APK instalado e a correção da publicação rastreável.
+- O índice e os títulos do Diário estão alinhados até DB-196; DB-195 registra a divergência visual do APK instalado e DB-196 registra a auditoria de contraste/paleta e a padronização das bordas.
 - Não declarar inspeção visual ou teste físico no Galaxy A06 / SM-A065M / Android 16. Permanecem necessários screenshots em retrato/paisagem e teste ELM327/ECU real, incluindo respostas 010C/012F.
 - A execução CI da PR #108 (run `41205305161`, HEAD `83f702bd7d5247e53f5291f7806477ecdcf3e981`) aprovou `validate` e `android-build`; o upload foi corretamente ignorado por ser evento de PR. O push subsequente na `main` precisa concluir e publicar o artefato do SHA atual antes de enviar novo link de APK.
 
@@ -5021,3 +5021,20 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Confirmar que o artefato APK e o checksum foram publicados nessa execução, baixar o APK e registrar seu SHA-256/commit de origem.
 - Repetir a inspeção no Galaxy A06 em retrato, paisagem, escala padrão e fonte ampliada; medir os cinco alvos interativos e verificar a exibição completa do cartão de sessão.
 - Validar Bluetooth/ECU separadamente: a imagem atual não comprova resposta 010C nem conexão funcional.
+
+
+## DB-196 · 2026-11-02 — Auditoria da paleta e contraste das bordas do layout
+
+### Alterações aplicadas
+- Auditoria da branch main no SHA `a741112b70b04d22a31b5512b92b1c60dfe61e22`: cores hexadecimais repetidas estavam declaradas diretamente nos estilos, apesar da existência de `src/ui/theme.ts`.
+- O token `COLORS.border` foi ajustado de `#28415f` para `#456a92`. O contraste calculado é aproximadamente 3,36:1 sobre `#07111f`, 3,07:1 sobre `#0e1b2d` e 3,03:1 sobre `#111c2e`.
+- Criados tokens explícitos para borda sutil, borda de seleção, estados de sucesso/falha e destaque teal. Bordas de cartões, seletores e componentes de navegação foram alinhadas ao tema sem substituir as cores funcionais da telemetria.
+- Status de armazenamento e avisos passam a consumir `COLORS.success`, `COLORS.warning` e `COLORS.danger`; texto auxiliar de baixo contraste foi trocado por `COLORS.textSubtle`.
+- `tests/screenTheme.test.js` agora verifica contraste mínimo 3:1 para bordas e 4,5:1 para texto auxiliar, além de bloquear valores hexadecimais diretamente nas propriedades de borda das telas.
+- Atualizada a expectativa do teste de navegação para a nova borda ativa tokenizada.
+
+### Limites e não regressão
+- Nenhuma alteração em Bluetooth Classic, ELM327, comandos/PIDs, ECU, polling, GPS, autonomia, telemetria, SQLite, histórico ou persistência.
+- A busca não encontrou arquivo, diretório ou alias `@/pantone`; não foi inventada uma especificação Pantone oficial. O tema existente permanece a fonte de cores do app.
+- Fonte ampliada/zoom do One UI continuam pendentes de inspeção visual no Galaxy A06. Esta mudança não declara validação física, screenshot ou teste de toque concluído.
+- A CI deve validar baseline, TypeScript, testes e build Android no SHA final da PR.
