@@ -77,7 +77,7 @@ Este documento é o contrato de aceitação entre mudanças, testes, diário e C
 
 ## Segurança da CI e distribuição do APK
 
-A CI pode validar e compilar em branches e pull requests, mas não pode publicar APK em execução de PR ou em repositório público. O único upload permitido é um artefato de curta retenção na branch `main` quando a visibilidade atual do repositório é `private`. Não criar GitHub Releases automáticas, URLs públicas estáveis nem conceder `contents: write` ao workflow de build. O APK deve acompanhar checksum SHA-256; Actions externas devem ser fixadas em SHA completo de commit verificado. A política é protegida por `tests/projectBaseline.test.js`.
+A CI deve publicar um artefato de workflow após qualquer build Android bem-sucedido em `push`, `pull_request`, `main` ou `workflow_dispatch`, inclusive no repositório público. O artefato contém APK standalone, checksum SHA-256 e metadados de proveniência (evento, run, SHA de build, SHA da cabeça/base da PR e ref). Eventos `push`/`pull_request` da mesma branch compartilham o grupo de concorrência para evitar compilações duplicadas; a execução mais recente é a que deve concluir. Não criar GitHub Releases automáticas, URLs públicas estáveis nem conceder `contents: write` ao workflow de build. Retenção do artefato: 14 dias. Actions externas devem ser fixadas em SHA completo de commit verificado. A política é protegida por `tests/projectBaseline.test.js`.
 
 ## Permissões e ciclo de vida GPS
 
