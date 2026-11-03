@@ -114,6 +114,17 @@ async function readEnvelope(path: string): Promise<AutoSaveEnvelope<MerivaPersis
  * falhar de forma fechada quando o principal ou a cópia anterior estiverem
  * corrompidos, inválidos ou pertencerem a uma versão futura.
  */
+/**
+ * Um temporário pode conter o snapshot mais recente de uma gravação
+ * interrompida. Mesmo que o JSON seja válido, não o substituir sem uma
+ * recuperação explícita, pois ele pode ser mais novo que main/previous.
+ */
+async function assertAutosaveTemporaryAbsent(path: string): Promise<void> {
+  const info = await FileSystem.getInfoAsync(path);
+  if (!info.exists) return;
+  throw new Error('AUTOSAVE_TEMPORARIO_PENDENTE; ARQUIVO PRESERVADO; RECUPERAÇÃO EXPLÍCITA NECESSÁRIA: ' + path);
+}
+
 async function assertAutosaveFileReplaceable(path: string): Promise<void> {
   const info = await FileSystem.getInfoAsync(path);
   if (!info.exists) return;
@@ -194,7 +205,7 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     // principal válido não autoriza substituir backup/temporário inválido.
     await assertAutosaveFileReplaceable(mainPath(base));
     await assertAutosaveFileReplaceable(previousPath(base));
-    await assertAutosaveFileReplaceable(tmpPath(base));
+    await assertAutosaveTemporaryAbsent(tmpPath(base));
 
     await FileSystem.writeAsStringAsync(tmpPath(base), content, {
       encoding: FileSystem.EncodingType.UTF8,
