@@ -4,7 +4,7 @@ import { getSharedObdConnection, getSharedObdStatus, subscribeSharedObd } from '
 import { addDriveCycle, readDriveCycles } from '../storage/driveCycleStorage';
 import { registerObdQuery } from '../meriva/autosaveIntegration';
 import { getAutoSaveState, updateAutoSaveState, initAutoSave, saveNow } from '../meriva/autosaveManager';
-import { persistTripBeforeRelease } from './tripFinalization';
+import { getOrCreatePendingTripCycle, persistTripBeforeRelease } from './tripFinalization';
 import { RealTripRecorder, getReliableTripConsumptionKml, shouldFinalizeStoppedTrip } from './tripRecorder';
 import { estimateRangeFromFuelLevel, fuelLevelPercentToLiters, isFuelReserve } from './fuelLevel';
 import { getCurrentAutonomyEstimate, isCurrentFuelLevelSample } from './autonomyPresentation';
@@ -73,6 +73,10 @@ class AutoTripService {
   private basePath = '';
   private running = false;
   private recorder: RealTripRecorder | null = null;
+  private pendingTripFinalizationCycle: {
+    recorder: RealTripRecorder;
+    cycle: ReturnType<RealTripRecorder['buildDriveCycle']>;
+  } | null = null;
   private loopPromise: Promise<void> | null = null;
   private generation = 0;
   private pollingPauseCount = 0;
@@ -847,7 +851,13 @@ class AutoTripService {
       this.recorderFinalizationError = null;
       return;
     }
-    const cycle = recorder.buildDriveCycle();
+    const pendingCycle = getOrCreatePendingTripCycle(
+      this.pendingTripFinalizationCycle,
+      recorder,
+      () => recorder.buildDriveCycle(),
+    );
+    this.pendingTripFinalizationCycle = pendingCycle;
+    const cycle = pendingCycle.cycle;
     this.recorderFinalizationPending = true;
 
     try {
@@ -912,6 +922,9 @@ class AutoTripService {
       },
       () => {
         if (this.recorder === recorder) this.recorder = null;
+        if (this.pendingTripFinalizationCycle?.recorder === recorder) {
+          this.pendingTripFinalizationCycle = null;
+        }
       },
       );
       this.recorderFinalizationPending = false;
