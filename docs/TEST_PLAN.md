@@ -249,3 +249,11 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 - Se o principal estiver ausente, tentar recuperar o snapshot anterior antes de iniciar um histórico vazio. Se o principal existir mas estiver ilegível, abortar sem sobrescrevê-lo.
 - Testes automatizados: primeira gravação, múltiplos eventos, concorrência, falha simulada de move, restauração do snapshot e leitura de arquivo principal ilegível.
 
+## BACKUP-MANIFEST-02 — Manifesto schema 2 e verificação SHA-256
+- Novo backup: manifesto schema 2 enumera cada arquivo por caminho relativo seguro, tamanho em bytes e SHA-256 do conteúdo UTF-8.
+- Integridade: a listagem não oferece backups com arquivos ausentes, extras, tamanho divergente ou hash divergente; restauração rejeita adulteração de mesmo tamanho e valida o staging/rollback.
+- Segurança de caminho: rejeitar caminhos absolutos, `..`, segmentos vazios/inseguros, barras invertidas e caminhos duplicados antes de acessar conteúdo.
+- Compatibilidade: manifestos schema 1 legados continuam legíveis/restauráveis; novos backups devem ser schema 2.
+- Cobertura: manter BANCO, APRENDIZADO, DTC, CONFIG, LEITURAS, LOGS, VIAGENS e MANUTENCAO nos backups. Não reduzir a cobertura nem limpar o histórico diário TXT.
+- Limite da garantia: SHA-256 sem chave detecta divergência em relação ao manifesto, mas não autentica a origem nem impede adulteração coordenada do manifesto e dos arquivos.
+- Testes: `tests/regression.test.js`; CI do SHA final com `validate` e `android-build`. Teste físico de restauração no Galaxy A06 permanece separado e não validado.
