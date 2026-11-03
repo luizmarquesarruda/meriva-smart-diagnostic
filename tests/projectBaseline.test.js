@@ -42,8 +42,12 @@ assert.match(workflow, /group: ci-\$\{\{ github\.workflow \}\}-\$\{\{ github\.ev
 assert.doesNotMatch(workflow, /^\s*publish-release\s*:/m, 'CI must never create public GitHub Releases automatically');
 assert.doesNotMatch(workflow, /^\s*contents:\s*write\s*$/m, 'the build workflow must not request write access to repository contents');
 assert.doesNotMatch(workflow, /github\.event\.repository\.visibility\s*==\s*'private'/, 'APK artifact must also be downloadable from the public project repository');
-assert.match(workflow, /github\.ref == 'refs\/heads\/main'/, 'APK artifact upload must be limited to main, never pull requests or work branches');
-assert.match(workflow, /retention-days:\s*14\b/, 'main APK artifact must remain available for 14 days');
+assert.match(workflow, /name: Upload Android APK \(CI artifact\)[\s\S]*?uses: actions\/upload-artifact@/, 'APK must be uploaded as a CI artifact after a successful Android build');
+assert.match(workflow, /name: meriva-smart-diagnostic-apk-\$\{\{ github\.run_number \}\}/, 'artifact name must identify its workflow run');
+assert.match(workflow, /retention-days:\s*14\b/, 'APK CI artifact must remain available for 14 days');
+assert.match(workflow, /pull_request:/, 'PR validation must remain enabled');
+assert.match(workflow, /needs: validate/, 'Android artifact must depend on successful validation');
+assert.match(workflow, /sha256sum --check android\/app\/build\/outputs\/apk\/release\/app-release\.apk\.sha256[\s\S]*?name: Upload Android APK/, 'artifact upload must happen only after checksum verification');
 assert.match(workflow, /sha256sum android\/app\/build\/outputs\/apk\/release\/app-release\.apk/, 'the APK must have a verifiable SHA-256 checksum');
 assert.match(workflow, /actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1/);
 assert.match(workflow, /actions\/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1/);
