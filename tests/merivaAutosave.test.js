@@ -285,7 +285,7 @@ test('2. salvar -> modificar -> salvar -> restaura última versão', async () =>
   assert.strictEqual(m.getAutoSaveState().settings.fase, 2);
 });
 
-test('3. arquivo principal corrompido -> restaura previous.json', async () => {
+test('3. principal corrompido permite fallback de leitura, mas bloqueia sobrescrita', async () => {
   const m = manager();
   m.disposeAutoSave();
   resetFS();
@@ -298,11 +298,22 @@ test('3. arquivo principal corrompido -> restaura previous.json', async () => {
     s.settings.fase = 'ultima';
   });
   await m.saveNow('critical'); // main = ultima, previous = anterior
-  files.set(`${CONFIG_DIR}/autosave.json`, '{ISTO É JSON CORROMPIDO');
+  const mainPath = `${CONFIG_DIR}/autosave.json`;
+  const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
+  const corruptMain = '{ISTO É JSON CORROMPIDO';
+  const previousBefore = files.get(previousPath);
+  files.set(mainPath, corruptMain);
   m.disposeAutoSave();
   await m.initAutoSave(BASE);
-  assert.strictEqual(m.getAutoSaveState().settings.fase, 'anterior', 'deve cair no previous.json');
-  assert.ok(files.has(`${CONFIG_DIR}/autosave.json`), 'arquivo corrompido não deve ser apagado no load');
+  assert.strictEqual(m.getAutoSaveState().settings.fase, 'anterior', 'deve cair no previous.json para leitura');
+
+  m.updateAutoSaveState((s) => { s.settings.novaAlteracao = true; });
+  assert.strictEqual(await m.saveNow('critical'), false,
+    'não deve gravar por cima do principal corrompido mesmo com fallback válido');
+  assert.strictEqual(files.get(mainPath), corruptMain, 'principal corrompido deve permanecer byte a byte');
+  assert.strictEqual(files.get(previousPath), previousBefore, 'cópia anterior válida não pode ser substituída pelo principal corrompido');
+  assert.match(m.getAutoSaveStatus().lastError, /JSON_CORROMPIDO/);
+  m.disposeAutoSave();
 });
 
 test('4. schema antigo -> migrar', async () => {
@@ -334,7 +345,7 @@ test('4. schema antigo -> migrar', async () => {
   delete migrations.AUTOSAVE_MIGRATIONS[0];
 });
 
-test('5. schema futuro -> não destruir, usar fallback', async () => {
+test('5. principal de schema futuro permite fallback de leitura, mas bloqueia sobrescrita', async () => {
   const m = manager();
   m.disposeAutoSave();
   resetFS();
@@ -354,15 +365,183 @@ test('5. schema futuro -> não destruir, usar fallback', async () => {
     source: 'futuro',
     payload: {},
   });
-  files.set(`${CONFIG_DIR}/autosave.json`, future);
+  const mainPath = `${CONFIG_DIR}/autosave.json`;
+  const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
+  const previousBefore = files.get(previousPath);
+  files.set(mainPath, future);
   m.disposeAutoSave();
   await m.initAutoSave(BASE);
-  assert.strictEqual(m.getAutoSaveState().settings.fase, 'valida', 'deve restaurar previous.json');
-  assert.strictEqual(
-    JSON.parse(files.get(`${CONFIG_DIR}/autosave.json`)).schemaVersion,
-    99,
-    'arquivo futuro não pode ser destruído',
-  );
+  assert.strictEqual(m.getAutoSaveState().settings.fase, 'valida', 'deve restaurar previous.json para leitura');
+
+  m.updateAutoSaveState((s) => { s.settings.novaAlteracao = true; });
+  assert.strictEqual(await m.saveNow('critical'), false,
+    'não deve gravar por cima do principal de schema futuro');
+  assert.strictEqual(files.get(mainPath), future, 'principal de schema futuro deve permanecer intacto');
+  assert.strictEqual(files.get(previousPath), previousBefore, 'fallback válido não pode ser sobrescrito');
+  assert.match(m.getAutoSaveStatus().lastError, /SCHEMA_FUTURO/);
+  m.disposeAutoSave();
+});
+
+test('5a. cópia anterior corrompida bloqueia gravação sem alterar principal nem backup', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  m.updateAutoSaveState((s) => { s.settings.fase = 'principal-valido'; });
+  await m.saveNow('critical');
+  m.updateAutoSaveState((s) => { s.settings.fase = 'anterior-valido'; });
+  await m.saveNow('critical');
+
+  const mainPath = `${CONFIG_DIR}/autosave.json`;
+  const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
+  const mainBefore = files.get(mainPath);
+  const corruptPrevious = '{BACKUP CORROMPIDO';
+  files.set(previousPath, corruptPrevious);
+
+  m.updateAutoSaveState((s) => { s.settings.novaAlteracao = true; });
+  assert.strictEqual(await m.saveNow('critical'), false, 'cópia anterior corrompida deve bloquear a gravação');
+  assert.strictEqual(files.get(mainPath), mainBefore, 'principal válido deve permanecer intacto');
+  assert.strictEqual(files.get(previousPath), corruptPrevious, 'cópia anterior corrompida deve permanecer intacta');
+  m.disposeAutoSave();
+});
+
+test('5b. cópia anterior de schema futuro bloqueia gravação sem alterar principal nem backup', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  m.updateAutoSaveState((s) => { s.settings.fase = 'principal-valido'; });
+  await m.saveNow('critical');
+  m.updateAutoSaveState((s) => { s.settings.fase = 'anterior-valido'; });
+  await m.saveNow('critical');
+
+  const mainPath = `${CONFIG_DIR}/autosave.json`;
+  const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
+  const mainBefore = files.get(mainPath);
+  const futurePrevious = JSON.stringify({
+    schemaVersion: 99,
+    savedAt: new Date().toISOString(),
+    dataType: 'APP_STATE',
+    source: 'versao-futura',
+    payload: {},
+  });
+  files.set(previousPath, futurePrevious);
+
+  m.updateAutoSaveState((s) => { s.settings.novaAlteracao = true; });
+  assert.strictEqual(await m.saveNow('critical'), false, 'cópia anterior de schema futuro deve bloquear a gravação');
+  assert.strictEqual(files.get(mainPath), mainBefore, 'principal válido deve permanecer intacto');
+  assert.strictEqual(files.get(previousPath), futurePrevious, 'cópia anterior futura deve permanecer intacta');
+  m.disposeAutoSave();
+});
+
+test('5c. temporário corrompido bloqueia gravação sem alterar os três arquivos', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  m.updateAutoSaveState((s) => { s.settings.fase = 'principal-valido'; });
+  await m.saveNow('critical');
+  m.updateAutoSaveState((s) => { s.settings.fase = 'anterior-valido'; });
+  await m.saveNow('critical');
+
+  const mainPath = `${CONFIG_DIR}/autosave.json`;
+  const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
+  const temporaryPath = `${CONFIG_DIR}/autosave.json.tmp`;
+  const mainBefore = files.get(mainPath);
+  const previousBefore = files.get(previousPath);
+  const corruptTemporary = '{TEMPORÁRIO CORROMPIDO';
+  files.set(temporaryPath, corruptTemporary);
+
+  m.updateAutoSaveState((s) => { s.settings.novaAlteracao = true; });
+  assert.strictEqual(await m.saveNow('critical'), false, 'temporário corrompido deve bloquear a gravação');
+  assert.strictEqual(files.get(mainPath), mainBefore);
+  assert.strictEqual(files.get(previousPath), previousBefore);
+  assert.strictEqual(files.get(temporaryPath), corruptTemporary, 'temporário corrompido deve permanecer intacto');
+  m.disposeAutoSave();
+});
+
+test('5d. temporário de schema futuro bloqueia gravação sem alterar os três arquivos', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  m.updateAutoSaveState((s) => { s.settings.fase = 'principal-valido'; });
+  await m.saveNow('critical');
+  m.updateAutoSaveState((s) => { s.settings.fase = 'anterior-valido'; });
+  await m.saveNow('critical');
+
+  const mainPath = `${CONFIG_DIR}/autosave.json`;
+  const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
+  const temporaryPath = `${CONFIG_DIR}/autosave.json.tmp`;
+  const mainBefore = files.get(mainPath);
+  const previousBefore = files.get(previousPath);
+  const futureTemporary = JSON.stringify({
+    schemaVersion: 99,
+    savedAt: new Date().toISOString(),
+    dataType: 'APP_STATE',
+    source: 'versao-futura',
+    payload: {},
+  });
+  files.set(temporaryPath, futureTemporary);
+
+  m.updateAutoSaveState((s) => { s.settings.novaAlteracao = true; });
+  assert.strictEqual(await m.saveNow('critical'), false, 'temporário de schema futuro deve bloquear a gravação');
+  assert.strictEqual(files.get(mainPath), mainBefore);
+  assert.strictEqual(files.get(previousPath), previousBefore);
+  assert.strictEqual(files.get(temporaryPath), futureTemporary, 'temporário futuro deve permanecer intacto');
+  m.disposeAutoSave();
+});
+
+test('5e. caminho principal convertido em diretório bloqueia gravação', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  m.updateAutoSaveState((s) => { s.settings.fase = 'principal-valido'; });
+  await m.saveNow('critical');
+  m.updateAutoSaveState((s) => { s.settings.fase = 'anterior-valido'; });
+  await m.saveNow('critical');
+
+  const mainPath = `${CONFIG_DIR}/autosave.json`;
+  const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
+  const previousBefore = files.get(previousPath);
+  files.delete(mainPath);
+  dirs.add(mainPath);
+
+  m.updateAutoSaveState((s) => { s.settings.novaAlteracao = true; });
+  assert.strictEqual(await m.saveNow('critical'), false, 'diretório no caminho do principal deve bloquear a gravação');
+  assert.strictEqual(files.has(mainPath), false, 'o caminho inesperado não pode virar arquivo por substituição');
+  assert.strictEqual(dirs.has(mainPath), true, 'o diretório original deve permanecer');
+  assert.strictEqual(files.get(previousPath), previousBefore, 'cópia anterior válida deve permanecer intacta');
+  m.disposeAutoSave();
+});
+
+test('5f. temporário JSON válido pendente bloqueia sobrescrita para preservar recuperação', async () => {
+  const m = manager();
+  m.disposeAutoSave();
+  resetFS();
+  await m.initAutoSave(BASE);
+  m.updateAutoSaveState((s) => { s.settings.fase = 'principal-valido'; });
+  await m.saveNow('critical');
+  m.updateAutoSaveState((s) => { s.settings.fase = 'segunda-versao'; });
+  await m.saveNow('critical');
+
+  const mainPath = `${CONFIG_DIR}/autosave.json`;
+  const previousPath = `${CONFIG_DIR}/autosave.previous.json`;
+  const temporaryPath = `${CONFIG_DIR}/autosave.json.tmp`;
+  const mainBefore = files.get(mainPath);
+  const previousBefore = files.get(previousPath);
+  const recoverableTemporary = files.get(mainPath);
+  assert.ok(recoverableTemporary, 'fixture deve conter envelope válido');
+  files.set(temporaryPath, recoverableTemporary);
+
+  m.updateAutoSaveState((s) => { s.settings.novaAlteracao = true; });
+  assert.strictEqual(await m.saveNow('critical'), false,
+    'um temporário válido pode conter a última gravação recuperável e deve bloquear sobrescrita');
+  assert.strictEqual(files.get(mainPath), mainBefore, 'principal deve permanecer intacto');
+  assert.strictEqual(files.get(previousPath), previousBefore, 'cópia anterior deve permanecer intacta');
+  assert.strictEqual(files.get(temporaryPath), recoverableTemporary, 'temporário recuperável deve permanecer byte a byte');
+  m.disposeAutoSave();
 });
 
 test('6. SIMULACAO não contamina learning nem banco de PIDs', async () => {

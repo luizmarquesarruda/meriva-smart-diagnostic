@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Persistência — proteção contra sobrescrita do autosave
+- O autosave valida principal e cópia anterior antes de gravar; JSON corrompido/inválido, diretório inesperado ou schema futuro bloqueia a escrita. Qualquer temporário preexistente, mesmo válido, é preservado e bloqueia novas gravações até recuperação explícita.
+- A leitura continua podendo recuperar a última cópia válida, mas não substitui automaticamente o arquivo problemático; principal e backup permanecem intactos até uma recuperação explícita.
+- Adicionados testes para principal/cópia anterior inválidos ou futuros e temporário corrompido, futuro ou válido recuperável. Histórico diário ECU, Bluetooth, GPS e fórmulas de autonomia não foram alterados.
+
+
 ### GPS / background location
 - Corrigido o fixture de recuperação para respeitar o timestamp estritamente crescente após amostras com precisão desconhecida.
 - Expandido o mock de Expo Location e incluídos testes de start/stop/reuso da tarefa nativa de localização em segundo plano.

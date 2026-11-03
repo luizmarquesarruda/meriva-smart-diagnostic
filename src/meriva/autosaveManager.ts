@@ -106,6 +106,61 @@ async function readEnvelope(path: string): Promise<AutoSaveEnvelope<MerivaPersis
   }
 }
 
+/**
+ * Nunca substituir um arquivo de autosave existente sem comprovar que ele
+ * pertence a um schema suportado e que seu payload continua íntegro.
+ *
+ * A leitura pode recuperar o último snapshot válido, mas a gravação deve
+ * falhar de forma fechada quando o principal ou a cópia anterior estiverem
+ * corrompidos, inválidos ou pertencerem a uma versão futura.
+ */
+/**
+ * Um temporário pode conter o snapshot mais recente de uma gravação
+ * interrompida. Mesmo que o JSON seja válido, não o substituir sem uma
+ * recuperação explícita, pois ele pode ser mais novo que main/previous.
+ */
+async function assertAutosaveTemporaryAbsent(path: string): Promise<void> {
+  const info = await FileSystem.getInfoAsync(path);
+  if (!info.exists) return;
+  throw new Error('AUTOSAVE_TEMPORARIO_PENDENTE; ARQUIVO PRESERVADO; RECUPERAÇÃO EXPLÍCITA NECESSÁRIA: ' + path);
+}
+
+async function assertAutosaveFileReplaceable(path: string): Promise<void> {
+  const info = await FileSystem.getInfoAsync(path);
+  if (!info.exists) return;
+  if (info.isDirectory) {
+    throw new Error('AUTOSAVE_JSON_PATH_IS_DIRECTORY; ARQUIVO PRESERVADO; GRAVAÇÃO BLOQUEADA: ' + path);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await FileSystem.readAsStringAsync(path, {
+      encoding: FileSystem.EncodingType.UTF8,
+    }));
+  } catch {
+    throw new Error('AUTOSAVE_JSON_CORROMPIDO; ARQUIVO ORIGINAL PRESERVADO; GRAVAÇÃO BLOQUEADA: ' + path);
+  }
+
+  if (
+    typeof parsed === 'object' &&
+    parsed !== null &&
+    typeof (parsed as { schemaVersion?: unknown }).schemaVersion === 'number' &&
+    Number.isInteger((parsed as { schemaVersion: number }).schemaVersion) &&
+    (parsed as { schemaVersion: number }).schemaVersion > AUTOSAVE_SCHEMA_VERSION
+  ) {
+    throw new Error('AUTOSAVE_SCHEMA_FUTURO; ARQUIVO ORIGINAL PRESERVADO; GRAVAÇÃO BLOQUEADA: ' + path);
+  }
+
+  if (!isValidEnvelope(parsed)) {
+    throw new Error('AUTOSAVE_JSON_INVALIDO; ARQUIVO ORIGINAL PRESERVADO; GRAVAÇÃO BLOQUEADA: ' + path);
+  }
+
+  const migrated = migrateEnvelope<MerivaPersistedState>(parsed);
+  if (!migrated || !validatePayload(migrated.payload)) {
+    throw new Error('AUTOSAVE_JSON_NÃO_VALIDADO; ARQUIVO ORIGINAL PRESERVADO; GRAVAÇÃO BLOQUEADA: ' + path);
+  }
+}
+
 async function loadLastValidEnvelope(
   basePath: string,
 ): Promise<AutoSaveEnvelope<MerivaPersistedState> | null> {
@@ -144,6 +199,13 @@ async function persistNow(reason: SaveReason): Promise<boolean> {
     };
     const content = JSON.stringify(envelope, null, 2);
     const base = runtime.basePath;
+
+    // Inspecionar principal, cópia anterior e temporário antes de escrever.
+    // Um fallback válido não autoriza destruir o principal inválido, e um
+    // principal válido não autoriza substituir backup/temporário inválido.
+    await assertAutosaveFileReplaceable(mainPath(base));
+    await assertAutosaveFileReplaceable(previousPath(base));
+    await assertAutosaveTemporaryAbsent(tmpPath(base));
 
     await FileSystem.writeAsStringAsync(tmpPath(base), content, {
       encoding: FileSystem.EncodingType.UTF8,
