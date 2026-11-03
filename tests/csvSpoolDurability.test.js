@@ -11,6 +11,8 @@ const directories = new Set(['/base', '/base/LOGS']);
 const unreadableDirectories = new Set();
 let failNextSpoolReadBack = false;
 let spoolReadBackFailures = 0;
+let failNextSpoolWrite = false;
+let partialSpoolWriteFailures = 0;
 
 function info(filePath) {
   const isDirectory = directories.has(filePath);
@@ -41,7 +43,14 @@ const fakeFileSystem = {
     ])).filter(Boolean);
   },
   async writeAsStringAsync(filePath, value) {
-    files.set(filePath, String(value));
+    const content = String(value);
+    if (failNextSpoolWrite && filePath.includes('.tmp-')) {
+      failNextSpoolWrite = false;
+      partialSpoolWriteFailures += 1;
+      files.set(filePath, content.slice(0, Math.max(1, Math.floor(content.length / 2))));
+      throw new Error('SPOOL_PARTIAL_WRITE_FAILURE: ' + filePath);
+    }
+    files.set(filePath, content);
   },
   async readAsStringAsync(filePath) {
     if (failNextSpoolReadBack && filePath.includes('.tmp-')) {
@@ -227,6 +236,36 @@ async function main() {
   const readbackRows = readbackSegments.flatMap((segment) => parseCsv(files.get(segment)).slice(1));
   assert.equal(readbackRows.filter((record) => record[1] === 'readback-retry').length, 1,
     'retry após falha de read-back deve persistir a linha exatamente uma vez');
+
+  // A partially written temp file must also be removed and safely retried.
+  const partialWritePath = '/base/LOGS/obd_raw_2026-11-01_partial-write.csv';
+  const partialOriginal = readbackHeader + existingRow
+    + 'x'.repeat(logger.MAX_CSV_SEGMENT_BYTES - Buffer.byteLength(readbackHeader + existingRow, 'utf8') - 4);
+  files.set(partialWritePath, partialOriginal);
+  failNextSpoolWrite = true;
+  await assert.rejects(
+    restartedLogger.appendCsvRowIfMissing(
+      partialWritePath,
+      { timestamp: '2026-11-01T10:01:00.000Z', eventId: 'partial-retry', pid: '010C' },
+      'eventId',
+    ),
+    /SPOOL_PARTIAL_WRITE_FAILURE/,
+  );
+  assert.deepEqual(
+    Array.from(files.keys()).filter((item) => item.startsWith(partialWritePath)),
+    [partialWritePath],
+    'falha de escrita parcial deve remover o temporário incompleto',
+  );
+  await restartedLogger.appendCsvRowIfMissing(
+    partialWritePath,
+    { timestamp: '2026-11-01T10:01:00.000Z', eventId: 'partial-retry', pid: '010C' },
+    'eventId',
+  );
+  const partialWriteSegments = await restartedLogger.getCsvLogSegments(partialWritePath);
+  const partialWriteRows = partialWriteSegments.flatMap((segment) => parseCsv(files.get(segment)).slice(1));
+  assert.equal(partialSpoolWriteFailures, 1);
+  assert.equal(partialWriteRows.filter((record) => record[1] === 'partial-retry').length, 1,
+    'retry após escrita parcial deve persistir a linha exatamente uma vez');
 
   // The live overflow path must restore the complete pending batch after a failed spool write.
   const queueSpillPath = '/base/LOGS/obd_raw_2026-11-01_queue-spill.csv';
