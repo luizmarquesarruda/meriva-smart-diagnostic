@@ -275,10 +275,20 @@ async function createBackupSnapshot(
   dataDirectories: readonly string[] = BACKUP_DATA_DIRS,
 ): Promise<BackupInfo> {
   await flushCsvLogs();
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const timestampBase = new Date().toISOString().replace(/[:.]/g, '-');
   const backupRoot = `${basePath}/BACKUP`;
-  const backupDir = `${backupRoot}/meriva_smart_${timestamp}`;
+  let timestamp = timestampBase;
+  let suffix = 0;
+  let backupDir = `${backupRoot}/meriva_smart_${timestamp}`;
+  while ((await FileSystem.getInfoAsync(backupDir)).exists) {
+    suffix += 1;
+    timestamp = `${timestampBase}-${String(suffix).padStart(2, '0')}`;
+    backupDir = `${backupRoot}/meriva_smart_${timestamp}`;
+  }
   await FileSystem.makeDirectoryAsync(backupDir, { intermediates: true });
+  if (!(await FileSystem.getInfoAsync(backupDir)).exists) {
+    throw new Error('BACKUP_DIRECTORY_RESERVATION_FAILED: ' + backupDir);
+  }
 
   const included: string[] = [];
   const files: BackupDirectoryManifest[] = [];
