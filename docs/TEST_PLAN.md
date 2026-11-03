@@ -254,7 +254,8 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 ## AUTOSAVE-ATOMIC-02 — Proteção de principal, backup e temporário
 
 - Antes de escrever, ler e validar os caminhos `CONFIG/autosave.json`, `CONFIG/autosave.previous.json` e `CONFIG/autosave.json.tmp`.
-- Se qualquer caminho existente for diretório, JSON ilegível/corrompido, envelope inválido, payload inválido ou schema futuro, bloquear a gravação e preservar o conteúdo original.
+- Se o principal ou cópia anterior existente for diretório, JSON ilegível/corrompido, envelope inválido, payload inválido ou schema futuro, bloquear a gravação e preservar o conteúdo original.
+- Se o temporário existir por qualquer motivo, mesmo como envelope válido, bloquear a gravação e preservar o temporário: pode ser o último snapshot de uma gravação interrompida.
 - A recuperação do último envelope válido permanece somente leitura até que o arquivo problemático seja recuperado explicitamente; fallback válido não autoriza substituir o principal inválido.
-- Testes automatizados: principal corrompido/futuro com backup válido, backup corrompido/futuro com principal válido e temporário corrompido/futuro. Verificar retorno `false` e igualdade byte a byte dos três arquivos.
+- Testes automatizados: principal corrompido/futuro com backup válido, backup corrompido/futuro com principal válido, temporário corrompido/futuro e temporário válido. Verificar retorno `false` e igualdade byte a byte dos três arquivos.
 - A validação por Node/mock não substitui medição/ensaio de persistência no Galaxy A06; não afirmar teste físico sem execução.
