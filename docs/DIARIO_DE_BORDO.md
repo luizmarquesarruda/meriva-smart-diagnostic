@@ -5169,9 +5169,9 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 ### Correção aplicada
 - Criado `getOrCreatePendingTripCycle()` em `src/trip/tripFinalization.ts`, associado à identidade do gravador. Enquanto a mesma viagem estiver pendente, o objeto e o ID finalizado são reutilizados; um novo gravador recebe um ciclo novo.
 - `AutoTripService` mantém o ciclo pendente até todas as etapas de persistência concluírem e limpa o cache somente na liberação do gravador.
-- `tests/regression.test.js` cobre a reutilização do mesmo objeto/ID em retry e a criação de um ID novo para um gravador diferente.
+- `tests/regression.test.js` simula gravação do índice seguida de falha no autosave e retry; confirma o mesmo ID, uma única viagem e um único incremento de autonomia. Também verifica ID novo para outro gravador.
 
 ### Validação e limites
 - O teste novo foi incorporado à suíte de regressão existente. CI do SHA final e compilação Android precisam confirmar a alteração; resultado ainda **não validado** neste registro.
-- O caminho de spool foi reavaliado: usa arquivo temporário, read-back, validação de cabeçalho/quantidade/tamanho e só então move para o segmento canônico; falhas removem o temporário, enquanto `spillPendingCsvRows()` devolve o lote não confirmado à fila. `tests/csvSpoolDurability.test.js` agora injeta falha de read-back após escrita, confirma ausência de arquivo parcial e verifica retry com uma única linha.
+- O spool usa arquivo temporário, read-back, validação de cabeçalho/quantidade/tamanho e move para o segmento canônico somente após validar. `tests/csvSpoolDurability.test.js` injeta falha de read-back e escrita parcial após criar o temporário; confirma limpeza, retorno do lote de overflow à fila, retry sem perda/duplicação e persistência de 10.000 linhas com IDs únicos.
 - Nenhuma alteração em Bluetooth/ELM/ECU, PID, GPS, autonomia/fórmulas, tanque, SQLite ou histórico diário ECU. SQLite continua condicionado às medições reais aprovadas no Galaxy A06.
