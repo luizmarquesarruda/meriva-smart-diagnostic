@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Fase 1 — Integridade e armazenamento
-- Novos backups preservam os oito diretórios de dados, inclusive `LEITURAS` e `LOGS`; o manifesto schema 2 verifica inventário, caminho relativo, tamanho e SHA-256 UTF-8 por arquivo. Manifestos schema 1 continuam aceitos para restauração legada; a cópia de segurança pré-restauração cobre todos os diretórios substituídos.
+- Novos backups preservam e verificam os oito diretórios de dados, inclusive `LEITURAS` e `LOGS`, com manifesto schema 2 (inventário, caminho relativo, tamanho e SHA-256 UTF-8 por arquivo). Manifestos schema 1 continuam legíveis; na restauração, `LEITURAS` e `LOGS` são mantidos no aparelho para não substituir telemetria mais recente. A cópia de segurança pré-restauração cobre todos os diretórios do snapshot.
 - O índice de viagens passou a ter schema versionado. JSON corrompido e schema futuro bloqueiam migração/gravação; uma cópia anterior validada pode ser usada somente para leitura, sem substituir o arquivo original.
 - Configurações, perfil do veículo, aprendizado e manutenção passaram a usar leitura com recuperação somente de cópia validada e gravação JSON temporária com validação, cópia anterior e rollback.
 - A Central de Saúde concentra avisos de JSON corrompido, schema futuro, recuperação, falhas TXT, descartes/falhas CSV e limpeza. A tela Armazenamento mantém detalhes operacionais e apresenta BACKUP separadamente.

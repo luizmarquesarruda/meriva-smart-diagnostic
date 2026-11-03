@@ -55,7 +55,7 @@ A branch mantém o fluxo OBD/ELM327 existente e inclui testes automatizados para
 | SPLASH-01 | Inicialização fria de APK nativo | Fundo e imagem de marca corretos; transição para o app sem tela vazia persistente | gate de baseline verifica plugin, caminho e assinatura PNG; inspeção visual em Android instalado continua obrigatória |
 | BUILD-01 | Commit final da PR | Gate, TypeScript, suíte e build Android concluídos com sucesso para o mesmo SHA | execução GitHub Actions do SHA exato |
 | BACKUP-01 | Criar backup completo com registros de manutenção/abastecimento e telemetria | Manifesto inclui os oito diretórios BANCO, APRENDIZADO, DTC, CONFIG, LEITURAS, LOGS, VIAGENS e MANUTENCAO; schema 2 verifica inventário, tamanho e SHA-256 por arquivo | `tests/regression.test.js`, `tests/storageIntegrity.test.js` |
-| BACKUP-02 | Restaurar snapshot íntegro com dados posteriores no aparelho | Desconectar OBD, salvar estado atual, criar safety backup, restaurar diretórios listados e re-hidratar autosave; rollback em falha de cópia | `tests/regression.test.js`, CI e teste Android |
+| BACKUP-02 | Restaurar snapshot íntegro sem descartar telemetria mais recente | Criar safety backup dos diretórios presentes; restaurar dados mutáveis e preservar `LEITURAS`/`LOGS` atuais; rollback em falha | `tests/regression.test.js`, CI e teste Android |
 | BACKUP-03 | Snapshot alterado ou incompleto | Não oferecer backup inválido e rejeitar restauração com divergência de manifesto/tamanho | `tests/regression.test.js` |
 
 ## Critérios para recursos adicionais
@@ -209,7 +209,7 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 - Data do CSV de viagem: usar o calendário local da data de início da viagem, não a data UTC do momento de gravação.
 - CSV: manter ordenação de colunas existente; ao aparecer campo novo, migrar cabeçalho e linhas antigas sem deslocar valores. Fila pendente possui teto explícito e contador de linhas descartadas.
 - Cota: quando ultrapassada, limpeza remove apenas arquivos descartáveis de LOGS/LEITURAS até a meta possível. Erro ao consultar tamanho deve ser propagado e nunca virar zero silencioso.
-- Backup: descarregar CSV antes de copiar; preservar os oito diretórios de dados; validar schema 2, inventário, caminho relativo, tamanho e SHA-256 UTF-8 por arquivo; manter leitura/restauração de schema 1; remover backup parcial em caso de erro e reter no máximo cinco backups verificados.
+- Backup: descarregar CSV antes de copiar; arquivar os oito diretórios; validar schema 2, inventário, caminho relativo, tamanho e SHA-256 UTF-8 por arquivo; manter leitura de schema 1; na restauração, preservar `LEITURAS`/`LOGS` atuais e substituir apenas diretórios de dados mutáveis; remover backup parcial em caso de erro e reter no máximo cinco backups verificados.
 - Autosave: schema, dataType, timestamp e subestruturas devem ser validados; testar v0 com migração cadastrada, schema futuro, payload parcial, valores NaN/Infinity e restauração de previous.json.
 - GPS: coordenadas inválidas são ignoradas; precisão nula/negativa/não finita não conta como fix preciso; Haversine retorna NaN para coordenadas fora da faixa.
 - Consumo estimado: rejeitar temperaturas absolutas impossíveis e taxas calculadas NaN/Infinity/negativas.

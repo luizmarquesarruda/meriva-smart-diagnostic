@@ -378,6 +378,11 @@ export async function restoreBackup(basePath: string, backupName: string): Promi
   const backupRoot = `${basePath}/BACKUP`;
   const sourceDir = `${backupRoot}/${backupName}`;
   const manifest = await readVerifiedManifest(sourceDir);
+  // LEITURAS/LOGS ficam arquivados e verificados no backup, mas os dados
+  // operacionais mais recentes nunca são substituídos por uma restauração.
+  const directoriesToRestore = manifest.directories.filter((entry) =>
+    entry.directory !== 'LEITURAS' && entry.directory !== 'LOGS',
+  );
   const stagingDir = `${backupRoot}/restore-staging-${Date.now()}`;
   await FileSystem.makeDirectoryAsync(stagingDir, { intermediates: true });
 
@@ -406,7 +411,7 @@ export async function restoreBackup(basePath: string, backupName: string): Promi
     const restored: string[] = [];
 
     try {
-      for (const entry of manifest.directories) {
+      for (const entry of directoriesToRestore) {
         const target = `${basePath}/${entry.directory}`;
         await FileSystem.deleteAsync(target, { idempotent: true });
         await FileSystem.copyAsync({
@@ -425,7 +430,7 @@ export async function restoreBackup(basePath: string, backupName: string): Promi
       try {
         const safetyManifest = await readVerifiedManifest(safetyDir);
         const safetyEntries = new Map(safetyManifest.directories.map((entry) => [entry.directory, entry]));
-        for (const entry of manifest.directories) {
+        for (const entry of directoriesToRestore) {
           const target = `${basePath}/${entry.directory}`;
           const safetyEntry = safetyEntries.get(entry.directory);
           await FileSystem.deleteAsync(target, { idempotent: true });
@@ -463,7 +468,7 @@ export async function restoreBackup(basePath: string, backupName: string): Promi
       sizeBytes: manifest.payloadSizeBytes,
       includes: restored,
       preservedDirectories: RESTORABLE_BACKUP_DATA_DIRS.filter((dir) =>
-        !manifest.directories.some((entry) => entry.directory === dir),
+        !restored.includes(dir),
       ),
     };
   } finally {
