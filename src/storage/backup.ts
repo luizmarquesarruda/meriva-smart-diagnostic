@@ -334,7 +334,7 @@ async function createBackupSnapshot(
   }
 }
 
-/** Backups rotineiros excluem CSVs brutos de LEITURAS e LOGS. */
+/** Backups rotineiros incluem todos os diretórios configurados, inclusive LEITURAS e LOGS. */
 export async function createBackup(basePath: string): Promise<BackupInfo> {
   return createBackupSnapshot(basePath, BACKUP_DATA_DIRS);
 }
