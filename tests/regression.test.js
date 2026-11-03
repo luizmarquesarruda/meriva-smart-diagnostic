@@ -1174,7 +1174,31 @@ async function testAtomicJsonPersistenceAndMaintenanceRetention() {
   await atomic.writeJsonAtomically(target, { schemaVersion: 1, value: 'first' }, validate, future);
   await atomic.writeJsonAtomically(target, { schemaVersion: 1, value: 'second' }, validate, future);
   assert.strictEqual(JSON.parse(files.get(target)).value, 'second');
-  assert.strictEqual(JSON.parse(files.get(target.replace(/\.json$/, '.previous.json'))).value, 'first');
+  const previousPath = target.replace(/\.json$/, '.previous.json');
+  assert.strictEqual(JSON.parse(files.get(previousPath)).value, 'first');
+
+  const validPreviousSnapshot = files.get(previousPath);
+  const corruptPreviousSnapshot = '{corrupt-previous';
+  files.set(previousPath, corruptPreviousSnapshot);
+  await assert.rejects(
+    () => atomic.writeJsonAtomically(target, { schemaVersion: 1, value: 'must-not-overwrite' }, validate, future),
+    /JSON_PREVIOUS_COPY_INVALID/,
+  );
+  assert.strictEqual(files.get(previousPath), corruptPreviousSnapshot,
+    'a corrupt previous JSON snapshot must never be overwritten');
+  assert.strictEqual(JSON.parse(files.get(target)).value, 'second',
+    'a valid main JSON file must remain untouched when its backup is corrupt');
+
+  const futurePreviousSnapshot = JSON.stringify({ schemaVersion: 99, value: 'future-backup' });
+  files.set(previousPath, futurePreviousSnapshot);
+  await assert.rejects(
+    () => atomic.writeJsonAtomically(target, { schemaVersion: 1, value: 'must-not-overwrite-future' }, validate, future),
+    /JSON_PREVIOUS_SCHEMA_VERSION_NEWER_THAN_APP/,
+  );
+  assert.strictEqual(files.get(previousPath), futurePreviousSnapshot,
+    'a future-schema previous JSON snapshot must never be overwritten');
+  assert.strictEqual(JSON.parse(files.get(target)).value, 'second');
+  files.set(previousPath, validPreviousSnapshot);
 
   const corrupt = '{corrupt-main';
   files.set(target, corrupt);
