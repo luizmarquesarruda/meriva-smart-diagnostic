@@ -50,4 +50,11 @@ assert.match(cockpit, /<StatusBar style="light" backgroundColor=\{COLORS\.screen
 const layout = fs.readFileSync(path.join(root, 'app/_layout.tsx'), 'utf8');
 assert.match(layout, /headerStyle:\s*\{\s*backgroundColor:\s*COLORS\.screen/);
 assert.match(layout, /headerTintColor:\s*COLORS\.accent/);
+const cockpitSource = fs.readFileSync(path.join(root, 'app/index.tsx'), 'utf8');
+assert.match(cockpitSource, /bottomNavItemPortrait:\s*\{[^}]*minHeight:64/,
+  'alvos de toque da navegação inferior em retrato devem ter pelo menos 64 dp');
+assert.match(cockpitSource, /metricLabel:\s*\{[^}]*fontSize:9/,
+  'rótulos das métricas do cockpit devem manter tamanho legível');
+assert.match(cockpitSource, /quadrantLabel:\s*\{[^}]*fontSize:9/,
+  'rótulos dos quadrantes devem manter tamanho legível');
 console.log('Shared screen theme and title contract: PASS');
