@@ -1306,23 +1306,38 @@ async function testTripRecorderRetainedUntilPersistence() {
     () => ({ id: 'real_obd_' + (++cycleBuilds) }),
   );
   assert.strictEqual(cycleBuilds, 2, 'a new recorder must receive a new finalized cycle');
-  let released = false;
+  let releaseCount = 0;
+  const persistedTripIds = new Set();
+  let autonomyIncrements = 0;
+  const persistAttempt = async (cycle, failAfterIndexWrite) => {
+    const isNewTrip = !persistedTripIds.has(cycle.id);
+    persistedTripIds.add(cycle.id);
+    if (isNewTrip) autonomyIncrements += 1;
+    if (failAfterIndexWrite) throw new Error('AUTOSAVE_WRITE_FAILED');
+  };
   await assert.rejects(() => tripFinalization.persistTripBeforeRelease(
-    { id: 'trip-1' },
-    async () => { throw new Error('INDEX WRITE FAILED'); },
-    () => { released = true; },
-  ), /INDEX WRITE FAILED/);
-  assert.strictEqual(released, false, 'failed persistence must keep the recorder owned');
+    retryPendingCycle.cycle,
+    (cycle) => persistAttempt(cycle, true),
+    () => { releaseCount += 1; },
+  ), /AUTOSAVE_WRITE_FAILED/);
+  assert.strictEqual(releaseCount, 0, 'failed autosave must keep the recorder owned for retry');
 
-  let persisted = false;
+  const sameTripRetry = tripFinalization.getOrCreatePendingTripCycle(
+    retryPendingCycle,
+    recorderToken,
+    () => ({ id: 'real_obd_' + (++cycleBuilds) }),
+  );
+  assert.strictEqual(sameTripRetry.cycle.id, retryPendingCycle.cycle.id, 'retry after index write must keep the same ID');
   const completed = await tripFinalization.persistTripBeforeRelease(
-    { id: 'trip-1' },
-    async () => { persisted = true; },
-    () => { released = true; },
+    sameTripRetry.cycle,
+    (cycle) => persistAttempt(cycle, false),
+    () => { releaseCount += 1; },
   );
   assert.strictEqual(completed, true);
-  assert.strictEqual(persisted, true);
-  assert.strictEqual(released, true, 'recorder can be released only after persistence succeeds');
+  assert.strictEqual(persistedTripIds.size, 1, 'index retry must keep one unique trip');
+  assert.strictEqual(autonomyIncrements, 1, 'the same trip must increment autonomy only once');
+  assert.strictEqual(releaseCount, 1, 'recorder can be released only after persistence succeeds');
+  assert.strictEqual(cycleBuilds, 2, 'retry of the same recorder must not create another final timestamp');
 }
 
 async function testDriveCycleSummaryUsesWeightedRealSpeed() {
