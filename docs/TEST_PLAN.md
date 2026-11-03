@@ -249,3 +249,12 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 - Se o principal estiver ausente, tentar recuperar o snapshot anterior antes de iniciar um histórico vazio. Se o principal existir mas estiver ilegível, abortar sem sobrescrevê-lo.
 - Testes automatizados: primeira gravação, múltiplos eventos, concorrência, falha simulada de move, restauração do snapshot e leitura de arquivo principal ilegível.
 
+
+
+## AUTOSAVE-ATOMIC-02 — Proteção de principal, backup e temporário
+
+- Antes de escrever, ler e validar os caminhos `CONFIG/autosave.json`, `CONFIG/autosave.previous.json` e `CONFIG/autosave.json.tmp`.
+- Se qualquer caminho existente for diretório, JSON ilegível/corrompido, envelope inválido, payload inválido ou schema futuro, bloquear a gravação e preservar o conteúdo original.
+- A recuperação do último envelope válido permanece somente leitura até que o arquivo problemático seja recuperado explicitamente; fallback válido não autoriza substituir o principal inválido.
+- Testes automatizados: principal corrompido/futuro com backup válido, backup corrompido/futuro com principal válido e temporário corrompido/futuro. Verificar retorno `false` e igualdade byte a byte dos três arquivos.
+- A validação por Node/mock não substitui medição/ensaio de persistência no Galaxy A06; não afirmar teste físico sem execução.
