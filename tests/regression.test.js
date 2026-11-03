@@ -1204,7 +1204,7 @@ async function testBackupCompleteness() {
   await m.initAutoSave(BASE);
   const backup = loadTs(path.join(ROOT, 'src/storage/backup.ts'));
 
-  const expectedDirs = ['BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'VIAGENS', 'MANUTENCAO'];
+  const expectedDirs = ['BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'LEITURAS', 'LOGS', 'VIAGENS', 'MANUTENCAO'];
   for (const dir of expectedDirs) {
     await fakeFS.writeAsStringAsync(`${BASE}/${dir}/arquivo.txt`, dir);
   }
@@ -1225,13 +1225,17 @@ async function testBackupCompleteness() {
 
   const backupRoot = `${BASE}/BACKUP/meriva_smart_${info.timestamp}`;
   const manifest = JSON.parse(files.get(`${backupRoot}/manifest.json`));
-  assert.strictEqual(manifest.schemaVersion, 1);
+  assert.strictEqual(manifest.schemaVersion, 2);
   assert.strictEqual(manifest.payloadSizeBytes, info.sizeBytes,
     'manifest deve declarar tamanho verificado do conteúdo copiado');
   assert.deepStrictEqual(manifest.directories.map((item) => item.directory), expectedDirs);
   for (const dir of ['LEITURAS', 'LOGS']) {
     assert.ok(files.has(`${BASE}/${dir}/arquivo.txt`), `${dir} original deve permanecer no dispositivo`);
-    assert.ok(!files.has(`${backupRoot}/${dir}/arquivo.txt`), `${dir} não deve ser copiado em novos backups`);
+    assert.strictEqual(
+      files.get(`${backupRoot}/${dir}/arquivo.txt`),
+      dir,
+      `backup deve preservar os dados de ${dir}`,
+    );
   }
   for (const dir of expectedDirs) {
     assert.strictEqual(

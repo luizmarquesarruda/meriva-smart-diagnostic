@@ -390,13 +390,14 @@ async function main() {
   assert.equal(files.get(indexPath), beforeBenchmark, 'exportar relatório também não pode alterar o histórico');
 
   const backupBase = '/doc/BACKUP_POLICY_TEST';
-  for (const directory of ['BANCO', 'LEITURAS', 'LOGS', 'VIAGENS']) {
+  for (const directory of ['BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'LEITURAS', 'LOGS', 'VIAGENS', 'MANUTENCAO']) {
     ensureDirectory(backupBase + '/' + directory);
     files.set(backupBase + '/' + directory + '/' + directory.toLowerCase() + (directory === 'BANCO' ? '.json' : '.csv'), 'conteúdo');
   }
   const createdBackup = await backup.createBackup(backupBase);
-  assert.ok(!createdBackup.includes.includes('LEITURAS'));
-  assert.ok(!createdBackup.includes.includes('LOGS'), 'novos backups não devem copiar CSVs brutos de LOGS');
+  assert.deepStrictEqual(createdBackup.includes, [
+    'BANCO', 'APRENDIZADO', 'DTC', 'CONFIG', 'LEITURAS', 'LOGS', 'VIAGENS', 'MANUTENCAO',
+  ], 'backup deve preservar os oito diretórios de dados');
   assert.ok(files.has(backupBase + '/LEITURAS/leituras.csv'), 'a política de backup não pode apagar a origem LEITURAS');
   assert.ok(files.has(backupBase + '/LOGS/logs.csv'), 'a política de backup não pode apagar a origem LOGS');
 
