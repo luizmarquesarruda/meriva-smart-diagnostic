@@ -45,6 +45,7 @@ assert.doesNotMatch(workflow, /github\.event\.repository\.visibility\s*==\s*'pri
 assert.match(workflow, /name: Upload Android APK artifact[\s\S]*?uses: actions\/upload-artifact@/, 'successful Android builds must upload a workflow artifact');
 assert.match(workflow, /android\/app\/build\/outputs\/apk\/release\/app-release\.apk/, 'artifact must contain the standalone APK');
 assert.match(workflow, /app-release\.apk\.sha256/, 'artifact must contain the APK SHA-256 file');
+assert.match(workflow, /build-info\.txt/, 'artifact must contain build provenance metadata');
 assert.match(workflow, /retention-days:\s*14\b/, 'APK artifact must remain available for 14 days');
 assert.match(workflow, /sha256sum android\/app\/build\/outputs\/apk\/release\/app-release\.apk/, 'the APK must have a verifiable SHA-256 checksum');
 assert.match(workflow, /actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1/);
