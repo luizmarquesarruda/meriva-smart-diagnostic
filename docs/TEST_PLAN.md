@@ -277,3 +277,4 @@ O catálogo atual contém 34 PIDs, 20 fórmulas, 34 faixas e 30 avaliações de 
 - O nome do artefato deve identificar evento e número da PR/execução; retenção esperada: 14 dias.
 - Confirmar que execução de PR disponibiliza artefato na página Actions e que o ZIP baixado contém `app-release.apk` e `app-release.apk.sha256`; verificar checksum após extração.
 - Upload em PR não pode executar merge, criar GitHub Release nem modificar `main`.
+- Verificar que execuções `push` e `pull_request` da mesma branch não se cancelam mutuamente; o grupo de concorrência deve incluir o tipo do evento.
