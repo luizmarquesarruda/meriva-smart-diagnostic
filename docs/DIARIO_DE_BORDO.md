@@ -288,6 +288,7 @@
 - **DB-195** · 2026-11-02 — Divergência visual do APK instalado e rastreabilidade da publicação
 - **DB-196** · 2026-11-02 — Auditoria da paleta e contraste das bordas do layout
 - **DB-197** · 2026-11-02 — Adaptar cockpit à referência visual MERIVA SMART sem simular telemetria
+- **DB-198** · 2026-11-02 — Corrigir gate anti-regressão do artefato APK em PRs
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
