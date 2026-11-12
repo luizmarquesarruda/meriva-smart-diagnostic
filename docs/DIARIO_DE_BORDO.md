@@ -5083,3 +5083,11 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - O grupo de concorrência compartilhado foi mantido para evitar duas compilações por branch; a execução mais recente deve terminar.
 - O pacote do artefato inclui APK standalone, `.sha256` e `build-info.txt` com proveniência.
 - A auditoria é estática e baseada no código/testes da branch; não substitui teste de aparelho nem validação real do adaptador.
+
+
+## DB-198 · 2026-11-12 — Pesquisa de IA aberta e limites de uso
+- Selecionada uma rota de pesquisa aberta: Qwen Code (Apache-2.0) para assistência de desenvolvimento com provedor local; Qwen3-0.6B-GGUF (Apache-2.0, variante Q8_0 de aproximadamente 639 MB) como candidato de explicação offline; llama.cpp como runtime Android/NDK inicial. LiteRT-LM permanece alternativa Kotlin condicionada a modelo convertido compatível.
+- Escopo MERIVA limitado a explicar relatórios OBD já fechados, com origem e timestamp. Sem chamada remota, sem execução na fila Bluetooth, sem escrita ECU, limpeza DTC, calibração, inferência de PID ou substituição de dados N/D.
+- Criado docs/PLANO-IA-ABERTA-2026-11-12.md com licenças, fontes e critérios de teste. Nenhum peso, dependência ou código de IA foi incorporado.
+- Base técnica da Fase 1: PR #120 head 556c7e5b8900881349dae6c466df4db942c27bc5; CI #4881 (41721738265) passou em validate e android-build nesse SHA. Artefato APK SHA-256 92482bf809ccddba3b8aedcf238f81fbc2cfcb5d0861df2fdb2fe049f8cec603. Esta atualização documental gera novo head e requer sua própria CI.
+- Permanecem os riscos DB-197: índice VIAGENS fora de atomicJsonFile e fila CSV em memória/saturação. O histórico TXT diário permanece preservado sem retenção automática. Teste físico A06/ELM327/ECU: **não validado**.
