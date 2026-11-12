@@ -959,6 +959,180 @@ async function testRawLogger() {
     'interpreted log must use the same local date, not the UTC day');
 }
 
+async function testAppSettingsCorruptionDoesNotOverwrite() {
+  resetFS();
+  const basePath = BASE + '/settings-corrupt';
+  const settings = loadTs(path.join(ROOT, 'src/database/appSettings.ts'));
+  const target = basePath + '/CONFIG/app-settings.json';
+  const original = '{CONFIGURAÇÕES CORROMPIDAS';
+  files.set(target, original);
+
+  const loaded = await settings.readAppSettings(basePath);
+  assert.strictEqual(loaded.fuelType, 'FLEX', 'defaults podem ser usados somente em memória');
+  assert.strictEqual(files.get(target), original, 'a leitura nunca pode substituir o JSON corrompido');
+  await assert.rejects(
+    () => settings.writeAppSettings(basePath, { ...loaded, fuelType: 'ETANOL' }),
+    /JSON_CORRUPTED/,
+    'uma edição deve bloquear a gravação até recuperação explícita',
+  );
+  assert.strictEqual(files.get(target), original);
+}
+
+async function testVehicleProfileCorruptionDoesNotRecreateFile() {
+  resetFS();
+  const basePath = BASE + '/vehicle-corrupt';
+  const vehicle = loadTs(path.join(ROOT, 'src/database/vehicleConfig.ts'));
+  const target = basePath + '/CONFIG/veiculo.json';
+  const original = '{PERFIL CORROMPIDO';
+  files.set(target, original);
+
+  const profile = await vehicle.ensureMerivaVehicleProfile(basePath);
+  assert.strictEqual(profile.make, 'Chevrolet', 'perfil de sessão pode existir em memória');
+  assert.strictEqual(files.get(target), original, 'bootstrap não pode recriar perfil sobre o JSON corrompido');
+  await assert.rejects(
+    () => vehicle.createVehicleProfile(basePath, profile),
+    /JSON_CORRUPTED/,
+  );
+  assert.strictEqual(files.get(target), original);
+}
+
+async function testLearningProfileCorruptionDoesNotResetLearning() {
+  resetFS();
+  const basePath = BASE + '/learning-corrupt';
+  const learning = loadTs(path.join(ROOT, 'src/database/learningProfile.ts'));
+  const target = basePath + '/APRENDIZADO/dna_meriva.json';
+  const original = '{APRENDIZADO CORROMPIDO';
+  files.set(target, original);
+
+  assert.strictEqual(await learning.readLearningProfile(basePath), null);
+  await learning.createLearningProfile(basePath, '2026-09-24T14:48:00.000Z');
+  assert.strictEqual(files.get(target), original,
+    'inicialização não pode substituir aprendizado corrompido por perfil vazio');
+  const profile = {
+    vehicleId: 'MERIVA_MAXX',
+    profileCreated: '2026-09-24T14:48:00.000Z',
+    lastUpdated: '2026-09-24T14:48:00.000Z',
+    seedVersion: 'NONE',
+    seedImportDate: '2026-09-24T14:48:00.000Z',
+    learningStatus: 'COLD_START',
+    confidenceThresholds: { low: 10, medium: 50, good: 200, high: 500 },
+    contextualData: [],
+    overallStatistics: {},
+    globalSampleCounts: { seedSamples: 0, realSamples: 0, totalSamples: 0 },
+    source: 'REAL_ONLY',
+    seedWeight: 0,
+    dataContamination: { simulationDetected: 0, simulationFiltered: 0 },
+  };
+  await assert.rejects(() => learning.saveLearningProfile(basePath, profile), /JSON_CORRUPTED/);
+  assert.strictEqual(files.get(target), original);
+}
+
+async function testMaintenanceCorruptionDoesNotEraseRecords() {
+  resetFS();
+  const basePath = BASE + '/maintenance-corrupt';
+  const maintenance = loadTs(path.join(ROOT, 'src/database/maintenanceStorage.ts'));
+  const target = basePath + '/MANUTENCAO/registros.json';
+  const original = '{MANUTENÇÃO CORROMPIDA';
+  files.set(target, original);
+
+  const loaded = await maintenance.readMaintenanceData(basePath);
+  assert.deepStrictEqual(loaded.fuelings, []);
+  await assert.rejects(
+    () => maintenance.writeMaintenanceData(basePath, loaded),
+    /JSON_CORRUPTED/,
+    'edição não pode substituir registros ilegíveis por JSON vazio',
+  );
+  assert.strictEqual(files.get(target), original);
+}
+
+async function testAtomicJsonFileRecoveryAndPendingTemps() {
+  resetFS();
+  const atomic = loadTs(path.join(ROOT, 'src/storage/atomicJsonFile.ts'));
+  const isDocument = (value) => typeof value === 'object' && value !== null &&
+    !Array.isArray(value) && value.schemaVersion === 1 && typeof value.value === 'string';
+  const isFuture = (value) => typeof value === 'object' && value !== null &&
+    typeof value.schemaVersion === 'number' && value.schemaVersion > 1;
+  const target = BASE + '/atomic/state.json';
+  const corrupt = '{JSON CORROMPIDO';
+  files.set(target, corrupt);
+
+  await assert.rejects(
+    () => atomic.writeJsonAtomically(target, { schemaVersion: 1, value: 'novo' }, isDocument, isFuture),
+    /JSON_CORRUPTED/,
+  );
+  assert.strictEqual(files.get(target), corrupt);
+
+  const fresh = BASE + '/atomic/fresh.json';
+  await atomic.writeJsonAtomically(fresh, { schemaVersion: 1, value: 'primeiro' }, isDocument, isFuture);
+  await atomic.writeJsonAtomically(fresh, { schemaVersion: 1, value: 'segundo' }, isDocument, isFuture);
+  assert.strictEqual(JSON.parse(files.get(fresh)).value, 'segundo');
+  assert.strictEqual(JSON.parse(files.get(BASE + '/atomic/fresh.previous.json')).value, 'primeiro');
+
+  const fallbackTarget = BASE + '/atomic/fallback.json';
+  const previousPath = BASE + '/atomic/fallback.previous.json';
+  const previousValue = JSON.stringify({ schemaVersion: 1, value: 'recuperável' });
+  files.set(fallbackTarget, corrupt);
+  files.set(previousPath, previousValue);
+  const recovered = await atomic.readJsonWithRecovery(fallbackTarget, isDocument, isFuture);
+  assert.deepStrictEqual(recovered, {
+    value: { schemaVersion: 1, value: 'recuperável' },
+    recoveredFromPrevious: true,
+  });
+  await assert.rejects(
+    () => atomic.writeJsonAtomically(fallbackTarget, { schemaVersion: 1, value: 'não sobrescrever' }, isDocument, isFuture),
+    /JSON_CORRUPTED/,
+  );
+  assert.strictEqual(files.get(fallbackTarget), corrupt);
+  assert.strictEqual(files.get(previousPath), previousValue);
+
+  const missingMain = BASE + '/atomic/missing-main.json';
+  files.set(BASE + '/atomic/missing-main.previous.json', previousValue);
+  await assert.rejects(
+    () => atomic.writeJsonAtomically(missingMain, { schemaVersion: 1, value: 'reparação implícita' }, isDocument, isFuture),
+    /JSON_MAIN_MISSING_PREVIOUS_AVAILABLE/,
+  );
+  assert.strictEqual(files.get(BASE + '/atomic/missing-main.previous.json'), previousValue);
+
+  const futureTarget = BASE + '/atomic/future-main.json';
+  const futurePreviousPath = BASE + '/atomic/future-main.previous.json';
+  const futureMain = JSON.stringify({ schemaVersion: 2, value: 'escrito por versão futura' });
+  const validPrevious = JSON.stringify({ schemaVersion: 1, value: 'recuperação válida' });
+  files.set(futureTarget, futureMain);
+  files.set(futurePreviousPath, validPrevious);
+  const futureRecovery = await atomic.readJsonWithRecovery(futureTarget, isDocument, isFuture);
+  assert.deepStrictEqual(futureRecovery, {
+    value: { schemaVersion: 1, value: 'recuperação válida' },
+    recoveredFromPrevious: true,
+  }, 'schema futuro deve bloquear escrita, mas permitir leitura da cópia anterior validada');
+  assert.strictEqual(files.get(futureTarget), futureMain);
+  assert.strictEqual(files.get(futurePreviousPath), validPrevious);
+  const health = loadTs(path.join(ROOT, 'src/storage/storageHealth.ts'));
+  assert.ok(
+    health.getStorageHealthIssues().some((issue) =>
+      issue.id === 'FUTURE_SCHEMA:' + futureTarget,
+    ) || health.getStorageHealthIssues().some((issue) => issue.id === 'FUTURE_SCHEMA:CONFIG/app-settings.json'),
+    'schema futuro deve permanecer visível na Central de Saúde',
+  );
+
+  const tempTarget = BASE + '/atomic/pending.json';
+  const pendingTemp = tempTarget + '.tmp';
+  const pending = JSON.stringify({ schemaVersion: 1, value: 'snapshot pendente' });
+  files.set(pendingTemp, pending);
+  await assert.rejects(
+    () => atomic.writeJsonAtomically(tempTarget, { schemaVersion: 1, value: 'novo' }, isDocument, isFuture),
+    /JSON_PENDING_TEMPORARY/,
+  );
+  assert.strictEqual(files.get(pendingTemp), pending);
+}
+
+async function testDataFilesFailClosed() {
+  await testAtomicJsonFileRecoveryAndPendingTemps();
+  await testAppSettingsCorruptionDoesNotOverwrite();
+  await testVehicleProfileCorruptionDoesNotRecreateFile();
+  await testLearningProfileCorruptionDoesNotResetLearning();
+  await testMaintenanceCorruptionDoesNotEraseRecords();
+}
+
 async function testVehicleProfile() {
   resetFS();
   const vehicle = loadTs(path.join(ROOT, 'src/database/vehicleConfig.ts'));
@@ -968,6 +1142,13 @@ async function testVehicleProfile() {
     make: 'Chevrolet',
     model: 'Meriva Maxx',
     engine: '1.4 8V',
+    displacementCm3: 1389,
+    cylinders: 4,
+    fuel: 'Gasolina / Álcool',
+    modelYearReference: '2011/2012',
+    tankCapacityL: 56,
+    reserveCapacityL: 5,
+    manualSource: 'Manual do Proprietário Chevrolet Meriva 2012',
     createdAt: new Date().toISOString(),
     lastModified: new Date().toISOString(),
     protocolBaseline: 'N/D',
@@ -1519,6 +1700,7 @@ async function main() {
     ['Bluetooth por eventos', testBluetoothEventTransport],
     ['quota configurável', testQuota],
     ['logger TX/RX', testRawLogger],
+    ['JSON críticos falham fechados diante de corrupção', testDataFilesFailClosed],
     ['perfil do veículo', testVehicleProfile],
     ['drive cycles', testDriveCycleValidation],
     ['resumo de velocidade real ponderado', testDriveCycleSummaryUsesWeightedRealSpeed],

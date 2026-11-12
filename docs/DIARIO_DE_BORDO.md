@@ -21,7 +21,7 @@
 - Validação PR #104: `validate` e `android-build` passaram no SHA `2cdbda3807a50e68cd1fe24fe3ff207dc125dbfd`.
 - A CI também passou no push da `main` após a integração da PR #105, SHA `b128b413427e612e621dc2ef2c82b6c2476ce659`. O push de main após o merge da #104 está em execução e deve ser consultado no SHA final correspondente.
 - O repositório permanece público. PR #108 foi integrada por squash em `24651428eb4dff69ad3086627e739df07c1de4dd`: o upload do APK passou a ocorrer apenas em push para `main`, com retenção de 14 dias; não cria GitHub Release nem publica em branches/PRs.
-- O índice e os títulos do Diário estão alinhados até DB-194; DB-195 registra a divergência visual observada no APK instalado e a correção da publicação rastreável.
+- O índice e os títulos do Diário estão alinhados até DB-196; DB-195 registra a divergência visual observada no APK instalado e DB-196 a proteção dos arquivos JSON críticos.
 - Não declarar inspeção visual ou teste físico no Galaxy A06 / SM-A065M / Android 16. Permanecem necessários screenshots em retrato/paisagem e teste ELM327/ECU real, incluindo respostas 010C/012F.
 - A execução CI da PR #108 (run `41205305161`, HEAD `83f702bd7d5247e53f5291f7806477ecdcf3e981`) aprovou `validate` e `android-build`; o upload foi corretamente ignorado por ser evento de PR. O push subsequente na `main` precisa concluir e publicar o artefato do SHA atual antes de enviar novo link de APK.
 
@@ -297,6 +297,10 @@
 - **DB-193** · 2026-10-31 — Velocidade derivada GPS e recuperação atômica do histórico ECU
 - **DB-194** · 2026-10-31 — Auditoria estática do layout no Galaxy A06 / Android 16
 - **DB-195** · 2026-11-02 — Divergência visual do APK instalado e rastreabilidade da publicação
+- **DB-196** · 2026-11-03 — Proteger arquivos JSON críticos contra corrupção, schema futuro e temporários pendentes
+- **DB-197** · 2026-11-03 — Auditoria dos módulos e artefato APK rastreável em PR
+- **DB-198** · 2026-11-12 — Pesquisa de IA aberta e limites de uso
+- **DB-199** · 2026-11-12 — Separar IA de programação e IA embarcada
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -5032,3 +5036,65 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Confirmar que o artefato APK e o checksum foram publicados nessa execução, baixar o APK e registrar seu SHA-256/commit de origem.
 - Repetir a inspeção no Galaxy A06 em retrato, paisagem, escala padrão e fonte ampliada; medir os cinco alvos interativos e verificar a exibição completa do cartão de sessão.
 - Validar Bluetooth/ECU separadamente: a imagem atual não comprova resposta 010C nem conexão funcional.
+
+
+## DB-196 · 2026-11-03 — Proteção dos arquivos JSON críticos
+
+### Alterações na branch
+- Branch: `fix/phase1-json-integrity-20261103`, derivada de `main` no SHA `472cedf215e2d4e0fd18331196946cf256e2d7c4`.
+- Criado `src/storage/atomicJsonFile.ts` com leitura por cópia anterior validada, gravação serializada, temporário fixo, read-back e bloqueio de principal/cópia/temporários inválidos ou futuros.
+- Protegidos autosave, configurações, perfil do veículo, aprendizado e manutenção. A inicialização pode usar defaults/perfil de sessão somente em memória quando necessário; os arquivos originais não são substituídos.
+- A Central de Saúde passou a exibir avisos de integridade do armazenamento.
+- Mantidos JSON/TXT/CSV. Sem SQLite e sem mudanças em Bluetooth, ECU, GPS, autonomia, comandos OBD ou histórico diário ECU.
+
+### Verificação
+- Testes de regressão cobrem corrupção nos cinco módulos JSON, cópia anterior somente leitura, temporário pendente e próximo salvamento após schema futuro.
+- A CI do commit de teste `92f60339bbdb31652753675008f471a61932301d` reproduziu a falha esperada do autosave futuro (RED).
+- A validação GREEN desta implementação depende da CI do SHA final desta branch; não reutilizar resultados de SHAs anteriores.
+- Persistência/recuperação física no Galaxy A06 / Android 16: **não validado**.
+
+### Integração
+- PRs #110/#114 foram usadas como referência de implementação, mas suas branches antigas/conflictantes não foram mescladas.
+- Esta fase será entregue em PR própria contra `main`; nenhuma mesclagem automática foi autorizada.
+
+## ARTEFATO APK EM PULL REQUEST — 2026-11-03
+
+- Causa encontrada: o job Android compilava e verificava o APK, mas o passo de upload usava condição exclusiva para `refs/heads/main`; por isso execuções de PR terminavam sem artefato.
+- Removida a condição restritiva do passo de upload: após build Android bem-sucedido, publica em push de branch (incluindo a branch da PR), evento `pull_request`, `main` e execução manual, mantendo APK standalone e SHA-256 no mesmo artefato.
+- Nome do artefato passa a identificar evento e número da PR/execução; retenção de 14 dias.
+- O upload em PR não mescla código, não cria release e não publica na branch principal.
+- Execução anterior 41698878105: build e checksum passaram no SHA `e64cd43e0290310948d5d34d33fcebdb5a348dd5`, mas nenhum artefato foi publicado devido à condição antiga.
+- A nova publicação só será considerada validada após uma execução de CI da PR produzir o artefato e permitir seu download.
+- Revisão da estratégia: `push` e `pull_request` da mesma branch voltam a compartilhar grupo de concorrência para evitar duas compilações Android idênticas. A execução mais recente deve concluir e publicar o artefato; a asserção do baseline foi atualizada.
+- O artefato passa a incluir `build-info.txt` com evento, run ID/número, SHA do workflow, SHA head/base da PR e ref, além do APK e checksum.
+
+
+## DB-197 · 2026-11-03 — Auditoria de módulos e entrega rastreável do APK
+
+### Auditoria estática inicial (branch da PR #120)
+- Inventário percorrido: telas Expo, persistência JSON/TXT/CSV, autosave, backup, quota/limpeza, viagens, DTC, PID/ELM327, Bluetooth Classic, GPS/background, combustível/autonomia, diagnóstico, permissões, catálogo de conhecimento, testes e CI.
+- Risco alto: `VIAGENS/index.json` mantém caminho próprio fora de `atomicJsonFile`; `readDriveCycles` pode retornar lista vazia quando principal e cópia anterior não são válidos, mascarando falha como ausência de viagens. A gravação usa temporário fixo sem bloquear temporário pendente e sem validação de schema futuro.
+- Risco alto: fila de telemetria CSV fica somente em memória até flush, tem teto de 10.000 linhas e descarta novas linhas ao atingir o teto; encerramento abrupto antes do flush pode perder amostras. Escrita existente reescreve arquivo completo, custo O(tamanho do arquivo) por lote.
+- Risco alto: backup verifica tamanhos por diretório, não hashes de conteúdo por arquivo; alteração de conteúdo mantendo tamanho pode passar pela verificação.
+- Risco médio: `cleanupOldLogs` e `cleanupOldReadings` removem arquivos por idade; quota automática limita candidatos a `LOGS` e `LEITURAS`. O TXT diário ECU em `VIAGENS` não é alvo dessas rotinas e não tem política de retenção no código inspecionado.
+- Risco médio: a camada de saúde de armazenamento cobre arquivos JSON protegidos, mas ainda não representa claramente falha de leitura do índice de viagens nem saturação/perda da fila CSV como alertas persistentes.
+- Integridade: parser/fórmulas validam bytes, faixas, origem e frescor em caminhos principais; validação física do ELM327/ECU e precisão dos PIDs no Galaxy A06 seguem não validadas.
+
+### Correção de CI/artefato
+- O baseline falhou no SHA `f08561782564d9846076576d390f2e2a0d747482` porque exigia grupo de concorrência e política de publicação antigos; não foi ignorado. O teste foi corrigido para exigir artefato de workflow e SHA-256 em qualquer build Android aprovado.
+- O grupo de concorrência compartilhado foi mantido para evitar duas compilações por branch; a execução mais recente deve terminar.
+- O pacote do artefato inclui APK standalone, `.sha256` e `build-info.txt` com proveniência.
+- A auditoria é estática e baseada no código/testes da branch; não substitui teste de aparelho nem validação real do adaptador.
+
+
+## DB-198 · 2026-11-12 — Pesquisa de IA aberta e limites de uso
+- Selecionada uma rota de pesquisa aberta: Qwen Code (Apache-2.0) para assistência de desenvolvimento com provedor local; Qwen3-0.6B-GGUF (Apache-2.0, variante Q8_0 de aproximadamente 639 MB) como candidato de explicação offline; llama.cpp como runtime Android/NDK inicial. LiteRT-LM permanece alternativa Kotlin condicionada a modelo convertido compatível.
+- Escopo MERIVA limitado a explicar relatórios OBD já fechados, com origem e timestamp. Sem chamada remota, sem execução na fila Bluetooth, sem escrita ECU, limpeza DTC, calibração, inferência de PID ou substituição de dados N/D.
+- Criado docs/PLANO-IA-ABERTA-2026-11-12.md com licenças, fontes e critérios de teste. Nenhum peso, dependência ou código de IA foi incorporado.
+- Base técnica da Fase 1: PR #120 head 556c7e5b8900881349dae6c466df4db942c27bc5; CI #4881 (41721738265) passou em validate e android-build nesse SHA. Artefato APK SHA-256 92482bf809ccddba3b8aedcf238f81fbc2cfcb5d0861df2fdb2fe049f8cec603. Esta atualização documental gera novo head e requer sua própria CI.
+- Permanecem os riscos DB-197: índice VIAGENS fora de atomicJsonFile e fila CSV em memória/saturação. O histórico TXT diário permanece preservado sem retenção automática. Teste físico A06/ELM327/ECU: **não validado**.
+
+## DB-199 · 2026-11-12 — Separar IA de programação e IA embarcada
+- A pesquisa foi refinada: Qwen3-0.6B não é o modelo recomendado para gerar/alterar código. Para o computador de desenvolvimento, recomendar Qwen Code com Qwen2.5-Coder-7B-Instruct via Ollama/LM Studio local; documentação do Qwen Code confirma uso de provedores locais OpenAI-compatible, e a ficha do modelo confirma licença Apache-2.0.
+- Separar agente que auxilia a programar (máquina de desenvolvimento) de inferência dentro do app (modelo pequeno, opcional). Sem envio a serviços externos, sem acesso a .env/secrets/dados pessoais e sem merge/deploy automático.
+- Seção de assistente de desenvolvimento adicionada a docs/PLANO-IA-ABERTA-2026-11-12.md. Não foi adicionada dependência ou IA executável nos aplicativos.

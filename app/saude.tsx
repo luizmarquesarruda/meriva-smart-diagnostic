@@ -10,11 +10,14 @@ import type { PidObservation } from '../src/types/sourceTypes';
 import { getLiveSeries, getVehicleConditionSnapshot } from '../src/obd/liveTelemetry';
 import { getSharedObdStatus } from '../src/obd/sharedConnection';
 import { getDtcDefinition } from '../src/obd/dtcDefinition';
+import { getStorageHealthIssues, subscribeStorageHealth } from '../src/storage/storageHealth';
 
 export default function SaudeScreen() {
   const layout = useMidLayout();
   const [state,setState]=useState(getAutoSaveState());
+  const [storageIssues,setStorageIssues]=useState(getStorageHealthIssues());
   useEffect(()=>{const t=setInterval(()=>setState(getAutoSaveState()),1000);return()=>clearInterval(t)},[]);
+  useEffect(()=>subscribeStorageHealth(()=>setStorageIssues(getStorageHealthIssues())),[]);
   const context = getVehicleConditionSnapshot();
   const activeDtcs = state.dtcs.filter((item) => isCurrentDiagnosticDtc(item));
   const diagnostic: DiagnosticResult = useMemo(() => {
@@ -39,6 +42,18 @@ export default function SaudeScreen() {
   const inconclusive = noCurrentFindings && !normal;
   return <SafeAreaView style={styles.container} edges={["top","bottom","left","right"]}><ScrollView contentContainerStyle={[styles.content,{paddingHorizontal:layout.horizontalPadding}]} showsHorizontalScrollIndicator={false}><View style={[styles.screenFrame,{maxWidth:layout.maxContentWidth}]}>
     <View style={styles.header}><Text style={[styles.title,{fontSize:layout.titleSize-3}]}>CENTRAL DE SAÚDE</Text><Text style={styles.subtitle}>EVIDÊNCIAS • DTC • HIPÓTESES</Text></View>
+    {storageIssues.length > 0 ? <>
+      <Text style={styles.section}>INTEGRIDADE DO ARMAZENAMENTO</Text>
+      {storageIssues.map((issue) => <View key={issue.id} style={styles.row}>
+        <View style={{flex:1}}>
+          <Text style={styles.name}>{issue.title}</Text>
+          <Text style={styles.detail}>{issue.message}</Text>
+          <Text style={styles.detail}>{issue.id} • {issue.updatedAt}</Text>
+        </View>
+        <Text style={styles.warn}>{issue.severity === 'critical' ? 'BLOQUEADO' : 'ATENÇÃO'}</Text>
+      </View>)}
+    </> : null}
+
     <View style={[styles.health, normal ? styles.healthOk : inconclusive ? styles.healthUnknown : styles.healthWarn]}><Text style={normal ? styles.bigOk : inconclusive ? styles.bigUnknown : styles.bigWarn}>{normal ? '● SEM ALERTAS NAS LEITURAS ATUAIS' : inconclusive ? '● DADOS INSUFICIENTES' : '● ATENÇÃO NECESSÁRIA'}</Text><Text style={styles.hint}>{normal ? 'Nenhuma hipótese local foi acionada pelos PIDs reais recentes; isso não certifica a saúde total do veículo.' : inconclusive ? 'Sem ECU validada e PIDs reais recentes, a ausência de alertas não significa que o sistema esteja normal.' : activeDtcs.length ? activeDtcs.length + ' DTC(s) ativo(s) de origem REAL_OBD registrados; confirme em nova leitura da ECU.' : 'Há hipóteses locais que exigem verificação; consulte as evidências e próximos testes.'}</Text></View>
     <Text style={styles.section}>CONEXÃO</Text>
     <View style={[styles.infoGrid, layout.landscape && styles.infoGridLandscape]}>

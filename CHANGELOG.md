@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — Artefato APK rastreável
+- CI agora publica o APK standalone e o SHA-256 em toda execução bem-sucedida do job Android, incluindo push em branches de PR, pull_request, main e execução manual.
+- O nome do artefato identifica o evento e o número da PR/execução; inclui `build-info.txt` com proveniência e retenção de 14 dias.
+- A publicação não faz merge, não cria GitHub Release e não altera a branch main.
+
 ## Unreleased — Controle de versão do aplicativo
 - Definido SemVer estável MAJOR.MINOR.PATCH, sincronizado entre package.json, package-lock.json e app.json.
 - Adicionado android.versionCode derivado de MAJOR×10000 + MINOR×100 + PATCH; MINOR/PATCH limitados a 0–99 para garantir crescimento monotônico.
@@ -8,6 +13,9 @@
 
 
 ## Unreleased
+
+- Persistência JSON: bloqueia sobrescrita de arquivos corrompidos, inválidos, de schema futuro e temporários pendentes em autosave, configurações, veículo, aprendizado e manutenção. A recuperação por cópia anterior é somente leitura.
+- Saúde: exibe avisos de integridade dos arquivos locais, sem alterar Bluetooth, GPS, autonomia ou histórico diário ECU.
 
 ### GPS / background location
 - Corrigido o fixture de recuperação para respeitar o timestamp estritamente crescente após amostras com precisão desconhecida.
