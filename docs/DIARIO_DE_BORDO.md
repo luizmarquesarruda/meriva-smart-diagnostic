@@ -299,6 +299,7 @@
 - **DB-195** · 2026-11-02 — Divergência visual do APK instalado e rastreabilidade da publicação
 - **DB-196** · 2026-11-03 — Proteger arquivos JSON críticos contra corrupção, schema futuro e temporários pendentes
 - **DB-197** · 2026-11-03 — Auditoria dos módulos e artefato APK rastreável em PR
+- **DB-198** · 2026-11-12 — Pesquisa de IA aberta e limites de uso
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
