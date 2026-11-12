@@ -5092,3 +5092,8 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Criado docs/PLANO-IA-ABERTA-2026-11-12.md com licenças, fontes e critérios de teste. Nenhum peso, dependência ou código de IA foi incorporado.
 - Base técnica da Fase 1: PR #120 head 556c7e5b8900881349dae6c466df4db942c27bc5; CI #4881 (41721738265) passou em validate e android-build nesse SHA. Artefato APK SHA-256 92482bf809ccddba3b8aedcf238f81fbc2cfcb5d0861df2fdb2fe049f8cec603. Esta atualização documental gera novo head e requer sua própria CI.
 - Permanecem os riscos DB-197: índice VIAGENS fora de atomicJsonFile e fila CSV em memória/saturação. O histórico TXT diário permanece preservado sem retenção automática. Teste físico A06/ELM327/ECU: **não validado**.
+
+## DB-199 · 2026-11-12 — Separar IA de programação e IA embarcada
+- A pesquisa foi refinada: Qwen3-0.6B não é o modelo recomendado para gerar/alterar código. Para o computador de desenvolvimento, recomendar Qwen Code com Qwen2.5-Coder-7B-Instruct via Ollama/LM Studio local; documentação do Qwen Code confirma uso de provedores locais OpenAI-compatible, e a ficha do modelo confirma licença Apache-2.0.
+- Separar agente que auxilia a programar (máquina de desenvolvimento) de inferência dentro do app (modelo pequeno, opcional). Sem envio a serviços externos, sem acesso a .env/secrets/dados pessoais e sem merge/deploy automático.
+- Seção de assistente de desenvolvimento adicionada a docs/PLANO-IA-ABERTA-2026-11-12.md. Não foi adicionada dependência ou IA executável nos aplicativos.
