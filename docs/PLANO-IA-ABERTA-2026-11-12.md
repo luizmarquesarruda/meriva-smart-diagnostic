@@ -44,3 +44,19 @@ A IA não pode ser condição para conexão ELM, captura de PID, diagnóstico b�
 ## Estado
 
 Pesquisa concluída; modelo e runtime selecionados apenas para protótipo. Nenhuma dependência, peso de modelo, ponte nativa ou chamada de IA foi adicionada. Compatibilidade e desempenho no Galaxy A06: **não validados**.
+
+
+## Assistente aberto para desenvolver os três repositórios
+
+Para programação, a recomendação é distinta do pequeno modelo a ser executado dentro do app:
+
+- **Agente:** Qwen Code, licença Apache-2.0. Ele aceita provedores locais por API compatível com OpenAI; a documentação oficial fornece exemplo com Ollama e modelo Qwen2.5 7B.
+- **Modelo de código:** Qwen2.5-Coder-7B-Instruct, licença Apache-2.0. A página oficial do modelo confirma a licença; o catálogo Ollama mostra pacote de aproximadamente 4,7 GB para qwen2.5-coder:7b.
+- **Execução:** Ollama ou LM Studio local, sem enviar o conteúdo dos projetos para serviços de terceiros. Não entregar arquivos .env, tokens, secrets, dados financeiros, VINs, MACs ou dados pessoais ao agente. O agente deve trabalhar em branch isolada, rodar testes, produzir diff e aguardar revisão humana; não fazer merge ou deploy autônomo.
+
+Fontes oficiais:
+- Qwen Code — provedores locais: https://qwenlm.github.io/qwen-code-docs/pt-BR/users/configuration/model-providers/
+- Qwen2.5-Coder-7B-Instruct — licença Apache-2.0: https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct
+- Pacotes Qwen2.5-Coder via Ollama: https://registry.ollama.com/library/qwen2.5-coder
+
+Não confundir esse modelo de programação para computador de desenvolvimento com o Qwen3-0.6B proposto para sumarização curta no Android. São cargas diferentes. O agente de programação não será incorporado aos aplicativos.
