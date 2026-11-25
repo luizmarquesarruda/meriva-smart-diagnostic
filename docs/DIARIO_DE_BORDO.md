@@ -5032,3 +5032,22 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Confirmar que o artefato APK e o checksum foram publicados nessa execução, baixar o APK e registrar seu SHA-256/commit de origem.
 - Repetir a inspeção no Galaxy A06 em retrato, paisagem, escala padrão e fonte ampliada; medir os cinco alvos interativos e verificar a exibição completa do cartão de sessão.
 - Validar Bluetooth/ECU separadamente: a imagem atual não comprova resposta 010C nem conexão funcional.
+
+
+## DB-200 · 2026-11-24 — Interromper fallback de protocolo após timeout sem prompt ELM
+
+### Problema confirmado por inspeção do fluxo
+- `BluetoothClassicTransport.readUntilPrompt()` marca o fluxo como dessincronizado quando o timeout ocorre sem receber o prompt `>`.
+- A próxima escrita já é bloqueada por `receiveDesynchronized`, registra a limpeza do socket e desconecta a sessão para impedir que uma resposta atrasada seja confundida com o próximo PID.
+- Apesar disso, `createRealElmSessionAttempt()` continuava percorrendo a lista de protocolos ATSP após timeout/ausência de resposta em `010C`. As tentativas seguintes não poderiam recuperar a sessão já invalidada e podiam substituir o erro original por falhas de escrita posteriores.
+
+### Correção nesta branch
+- Criado `hasCompleteElmResponse()`: o fallback só continua quando houve payload e o status não é TIMEOUT/NO_RESPONSE.
+- Timeout/ausência de resposta no primeiro `010C`, no comando ATSP ou no `010C` após seleção interrompe imediatamente o fallback, registra `PROTOCOL_FALLBACK_ABORTED` e fecha o candidato; a seleção automática pode avançar ao próximo dispositivo pareado.
+- Respostas completas como `NO DATA` continuam permitindo testar outro protocolo, pois o prompt foi recebido e o fluxo não foi declarado dessincronizado.
+- Incluídos testes de regressão para resposta positiva, NO DATA, comando não suportado, timeout, ausência de resposta e falha sem payload.
+
+### Escopo e validação
+- Nenhuma mudança em comandos OBD de escrita, ECU, PIDs suportados, GPS, autonomia, combustível, SQLite ou histórico diário.
+- Não foi alterada a exigência de resposta real válida `41 0C` para considerar ECU conectada.
+- CI e build Android desta branch ainda precisam concluir no mesmo SHA. Teste físico no Galaxy A06 / SM-A065M / Android 16 com o ELM327 real permanece **não validado**.
