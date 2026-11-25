@@ -297,6 +297,7 @@
 - **DB-193** · 2026-10-31 — Velocidade derivada GPS e recuperação atômica do histórico ECU
 - **DB-194** · 2026-10-31 — Auditoria estática do layout no Galaxy A06 / Android 16
 - **DB-195** · 2026-11-02 — Divergência visual do APK instalado e rastreabilidade da publicação
+- **DB-196** · 2026-11-24 — Interromper fallback de protocolo após timeout sem prompt ELM
 ---
 
 Este arquivo é o registro operacional das correções, auditorias e decisões técnicas do projeto.
@@ -5034,7 +5035,7 @@ DB-179 mudou corretamente o caminho de limpeza para aplicar timeout à Promise n
 - Validar Bluetooth/ECU separadamente: a imagem atual não comprova resposta 010C nem conexão funcional.
 
 
-## DB-200 · 2026-11-24 — Interromper fallback de protocolo após timeout sem prompt ELM
+## DB-196 · 2026-11-24 — Interromper fallback de protocolo após timeout sem prompt ELM
 
 ### Problema confirmado por inspeção do fluxo
 - `BluetoothClassicTransport.readUntilPrompt()` marca o fluxo como dessincronizado quando o timeout ocorre sem receber o prompt `>`.
