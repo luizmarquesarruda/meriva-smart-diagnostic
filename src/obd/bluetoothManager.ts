@@ -3,7 +3,7 @@ import RNBluetoothClassic from 'react-native-bluetooth-classic';
 import { BluetoothClassicTransport, BluetoothDeviceInfo, listBondedBluetoothDevices } from './bluetoothClassicTransport';
 import { ElmCommandResult, Elm327Session } from './elm327';
 import { parsePidResponse } from './parser';
-import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, mergeCompatibilityConfig, resolveMaxConnectionAttempts } from './elm327Compatibility';
+import { Elm327CompatibilityConfig, DEFAULT_ELM327_COMPATIBILITY, hasCompleteElmResponse, mergeCompatibilityConfig, resolveMaxConnectionAttempts } from './elm327Compatibility';
 import { discoverIntelligentPids } from './intelligentPidDiscovery';
 import { getBluetoothRadioRecoveryStopReason } from './bluetoothRadioRecovery';
 import type { PidDiscoveryCache } from '../meriva/autosaveState';
@@ -336,18 +336,59 @@ async function createRealElmSessionAttempt(
 
     const protocolFallbacks = ELM_PROTOCOL_FALLBACKS;
     let successfulForcedProtocol: string | null = null;
+    let protocolFallbackStopReason: string | null = null;
+
+    // A transport timeout without the ELM prompt poisons the current stream.
+    // Do not send ATSP/PID commands into that stream; close this candidate and
+    // let the caller advance to the next paired adapter.
+    if (!probeIsValid && !hasCompleteElmResponse(ecuProbe.status, ecuProbe.response)) {
+      protocolFallbackStopReason = `010C inicial sem resposta completa: ${ecuProbe.status}`;
+      logBluetoothDiagnostic('PROTOCOL_FALLBACK_ABORTED', {
+        phase: 'INITIAL_ECU_PROBE',
+        status: ecuProbe.status,
+        response: ecuProbe.response,
+        reason: protocolFallbackStopReason,
+      });
+    }
 
     for (const protocol of protocolFallbacks) {
-      if (probeIsValid) break;
+      if (probeIsValid || protocolFallbackStopReason) break;
       const forcedProtocol = await session.executeCommand(`ATSP${protocol}`);
+      if (!hasCompleteElmResponse(forcedProtocol.status, forcedProtocol.response)) {
+        protocolFallbackStopReason = `ATSP${protocol} sem resposta completa: ${forcedProtocol.status}`;
+        logBluetoothDiagnostic('PROTOCOL_FALLBACK_ABORTED', {
+          phase: 'PROTOCOL_SELECTION',
+          protocol,
+          status: forcedProtocol.status,
+          response: forcedProtocol.response,
+          reason: protocolFallbackStopReason,
+        });
+        break;
+      }
       if (forcedProtocol.status !== 'OK') continue;
+
       ecuProbe = await session.executeCommand('010C');
       probeIsValid = isValidEcuProbe(ecuProbe);
-      if (probeIsValid) successfulForcedProtocol = protocol;
+      if (probeIsValid) {
+        successfulForcedProtocol = protocol;
+      } else if (!hasCompleteElmResponse(ecuProbe.status, ecuProbe.response)) {
+        protocolFallbackStopReason = `010C após ATSP${protocol} sem resposta completa: ${ecuProbe.status}`;
+        logBluetoothDiagnostic('PROTOCOL_FALLBACK_ABORTED', {
+          phase: 'ECU_PROBE',
+          protocol,
+          status: ecuProbe.status,
+          response: ecuProbe.response,
+          reason: protocolFallbackStopReason,
+        });
+        break;
+      }
     }
 
     if (!probeIsValid) {
-      throw new Error(`ECU NÃO RESPONDEU AO 010C: ${ecuProbe.status} | RX=${ecuProbe.response || 'N/D'}`);
+      const fallbackDetail = protocolFallbackStopReason
+        ? ` | FALLBACK INTERROMPIDO: ${protocolFallbackStopReason}`
+        : '';
+      throw new Error(`ECU NÃO RESPONDEU AO 010C: ${ecuProbe.status} | RX=${ecuProbe.response || 'N/D'}${fallbackDetail}`);
     }
     callbacks?.onEcuResponding?.();
 

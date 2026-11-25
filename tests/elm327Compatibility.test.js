@@ -39,12 +39,23 @@ assert.equal(classify('ELM327 v1.5\r\n>'), 'OK');
 assert.equal(classify(''), 'NO_RESPONSE');
 
 const compatibility = loadTs(path.join(__dirname, '..', 'src', 'obd', 'elm327Compatibility.ts'));
-const { classifyElmError, mergeCompatibilityConfig, getRecoveryProtocolCommand, resolveMaxConnectionAttempts } = compatibility;
+const { classifyElmError, mergeCompatibilityConfig, getRecoveryProtocolCommand, resolveMaxConnectionAttempts, hasCompleteElmResponse } = compatibility;
 assert.equal(classifyElmError('NO DATA'), 'NO_DATA');
 assert.equal(classifyElmError('BUFFER FULL'), 'BUFFER_FULL');
 assert.equal(classifyElmError('BUS ERROR'), 'BUS_ERROR');
 assert.equal(classifyElmError('', 'TIMEOUT'), 'TIMEOUT');
 assert.equal(classifyElmError('?'), 'UNSUPPORTED');
+assert.strictEqual(hasCompleteElmResponse('OK', '41 0C 1A F8'), true);
+assert.strictEqual(hasCompleteElmResponse('ERROR', 'NO DATA'), true,
+  'NO DATA com prompt completo permite testar outro protocolo');
+assert.strictEqual(hasCompleteElmResponse('UNSUPPORTED', '?'), true,
+  'resposta de comando não suportado com prompt completo permite continuar');
+assert.strictEqual(hasCompleteElmResponse('TIMEOUT', ''), false,
+  'timeout sem prompt deve encerrar fallback para não reutilizar stream dessincronizado');
+assert.strictEqual(hasCompleteElmResponse('NO_RESPONSE', ''), false);
+assert.strictEqual(hasCompleteElmResponse('ERROR', ''), false,
+  'falha de transporte sem payload não é uma resposta ELM completa');
+
 const cfg = mergeCompatibilityConfig({ adaptiveTiming: true, adaptiveTimeoutMinMs: 2500, adaptiveTimeoutMaxMs: 12000 });
 assert.equal(cfg.adaptiveTiming, true);
 assert.equal(cfg.adaptiveTimeoutMinMs, 2500);

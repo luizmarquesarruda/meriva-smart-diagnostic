@@ -158,3 +158,9 @@ export function mergeCompatibilityConfig(
     protocolSelectionTimeoutMs: Math.max(1000, Math.round(merged.protocolSelectionTimeoutMs)),
   };
 }
+
+
+/** A protocol fallback is safe only while the prior ELM response reached its prompt. */
+export function hasCompleteElmResponse(status: string, response: string): boolean {
+  return status !== 'TIMEOUT' && status !== 'NO_RESPONSE' && response.trim().length > 0;
+}

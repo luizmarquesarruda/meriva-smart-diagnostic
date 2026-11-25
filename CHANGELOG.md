@@ -166,3 +166,9 @@
 ### Engenharia
 - CI com Expo Doctor, TypeScript, testes e build Android release standalone;
 - documentação de arquitetura, desenvolvimento e auditoria.
+
+
+### Bluetooth Classic / ELM327 — 2026-11-24
+- Interromper a sondagem de protocolos quando um comando OBD/AT termina em timeout, ausência de resposta ou sem payload completo. O transporte marca o fluxo como dessincronizado após timeout sem prompt; enviar novos comandos nessa mesma sessão era inútil e podia mascarar o erro original.
+- Preservar fallback para respostas completas como `NO DATA`, permitindo testar outros protocolos quando o ELM encerrou corretamente a resposta.
+- Adicionados testes unitários para diferenciar resposta completa de timeout/ausência de resposta. Validação física no Galaxy A06 + ELM327 permanece não validada.
